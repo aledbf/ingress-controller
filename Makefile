@@ -35,13 +35,13 @@ lint:
 
 test: fmt lint vet
 	@echo "+ $@"
-	@go test -v -tags "$(BUILDTAGS) cgo" $(shell go list ${PKG}/... | grep -v vendor)
+	@go test -v -race -tags "$(BUILDTAGS) cgo" $(shell go list ${PKG}/... | grep -v vendor)
 
 cover:
 	@echo "+ $@"
 	@go list -f '{{if len .TestGoFiles}}"go test -coverprofile={{.Dir}}/.coverprofile {{.ImportPath}}"{{end}}' $(shell go list ${PKG}/... | grep -v vendor) | xargs -L 1 sh -c
 	gover
-	goveralls -coverprofile=gover.coverprofile -service travis-ci -repotoken $COVERALLS_TOKEN
+	goveralls -coverprofile=gover.coverprofile -service travis-ci -repotoken ${COVERALLS_TOKEN}
 
 vet:
 	@echo "+ $@"
