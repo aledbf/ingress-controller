@@ -19,6 +19,7 @@ package ingress
 import (
 	"github.com/aledbf/ingress-controller/pkg/ingress/annotations/auth"
 	"github.com/aledbf/ingress-controller/pkg/ingress/annotations/authreq"
+	"github.com/aledbf/ingress-controller/pkg/ingress/annotations/authtls"
 	"github.com/aledbf/ingress-controller/pkg/ingress/annotations/ipwhitelist"
 	"github.com/aledbf/ingress-controller/pkg/ingress/annotations/proxy"
 	"github.com/aledbf/ingress-controller/pkg/ingress/annotations/ratelimit"
@@ -106,6 +107,7 @@ type Location struct {
 	EnableCORS      bool
 	ExternalAuth    authreq.External
 	Proxy           proxy.Configuration
+	CertificateAuth authtls.SSLCert
 }
 
 // LocationByPath sorts location by path
@@ -122,6 +124,8 @@ func (c LocationByPath) Less(i, j int) bool {
 type SSLCert struct {
 	CertFileName string
 	KeyFileName  string
+	CAFileName   string
+
 	// PemFileName contains the path to the file with the certificate and key concatenated
 	PemFileName string
 	// PemSHA contains the sha1 of the pem file.

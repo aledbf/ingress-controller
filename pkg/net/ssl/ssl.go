@@ -18,11 +18,13 @@ package nginx
 
 import (
 	"crypto/sha1"
+	"crypto/tls"
 	"crypto/x509"
 	"encoding/hex"
 	"encoding/pem"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"os"
 
 	"github.com/golang/glog"
@@ -32,35 +34,78 @@ import (
 )
 
 // AddOrUpdateCertAndKey creates a .pem file wth the cert and the key with the specified name
-func AddOrUpdateCertAndKey(name string, cert string, key string) (ingress.SSLCert, error) {
-	temporaryPemFileName := fmt.Sprintf("%v.pem", name)
-	pemFileName := fmt.Sprintf("%v/%v.pem", config.SSLDirectory, name)
+func AddOrUpdateCertAndKey(name string, cert string, key string, ca string) (ingress.SSLCert, error) {
+	pemName := fmt.Sprintf("%v.pem", name)
+	pemFileName := fmt.Sprintf("%v/%v", config.SSLDirectory, pemName)
 
-	temporaryPemFile, err := ioutil.TempFile("", temporaryPemFileName)
+	tempPemFile, err := ioutil.TempFile("", pemName)
 	if err != nil {
-		return ingress.SSLCert{}, fmt.Errorf("Couldn't create temp pem file %v: %v", temporaryPemFile.Name(), err)
+		return ingress.SSLCert{}, fmt.Errorf("Couldn't create temp pem file %v: %v", tempPemFile.Name(), err)
 	}
 
-	_, err = temporaryPemFile.WriteString(fmt.Sprintf("%v\n%v", cert, key))
+	_, err = tempPemFile.WriteString(fmt.Sprintf("%v\n%v", cert, key))
 	if err != nil {
-		return ingress.SSLCert{}, fmt.Errorf("Couldn't write to pem file %v: %v", temporaryPemFile.Name(), err)
+		return ingress.SSLCert{}, fmt.Errorf("Couldn't write to pem file %v: %v", tempPemFile.Name(), err)
 	}
 
-	err = temporaryPemFile.Close()
+	err = tempPemFile.Close()
 	if err != nil {
-		return ingress.SSLCert{}, fmt.Errorf("Couldn't close temp pem file %v: %v", temporaryPemFile.Name(), err)
+		return ingress.SSLCert{}, fmt.Errorf("Couldn't close temp pem file %v: %v", tempPemFile.Name(), err)
 	}
 
-	cn, err := commonNames(temporaryPemFile.Name())
+	pemCerts, err := ioutil.ReadFile(tempPemFile.Name())
 	if err != nil {
-		os.Remove(temporaryPemFile.Name())
 		return ingress.SSLCert{}, err
 	}
 
-	err = os.Rename(temporaryPemFile.Name(), pemFileName)
+	pembBock, _ := pem.Decode(pemCerts)
+	if pembBock == nil {
+		return ingress.SSLCert{}, fmt.Errorf("No valid PEM formatted block found")
+	}
+
+	pemCert, err := x509.ParseCertificate(pembBock.Bytes)
 	if err != nil {
-		os.Remove(temporaryPemFile.Name())
-		return ingress.SSLCert{}, fmt.Errorf("Couldn't move temp pem file %v to destination %v: %v", temporaryPemFile.Name(), pemFileName, err)
+		return ingress.SSLCert{}, err
+	}
+
+	cn := []string{pemCert.Subject.CommonName}
+	if len(pemCert.DNSNames) > 0 {
+		cn = append(cn, pemCert.DNSNames...)
+	}
+
+	if ca != "" {
+		cck, err := tls.LoadX509KeyPair(cert, key)
+		if err != nil {
+			log.Fatalf("client: loadkeys: %s", err)
+		}
+		if len(cck.Certificate) != 2 {
+			return ingress.SSLCert{}, fmt.Errorf("should have 2 concatenated certificates: cert and key")
+		}
+
+		caCert, err := ioutil.ReadFile(ca)
+		if err != nil {
+			return ingress.SSLCert{}, err
+		}
+
+		caCertPool := x509.NewCertPool()
+		caCertPool.AppendCertsFromPEM(caCert)
+		// Create tls config
+		tlsConfig := &tls.Config{
+			Certificates: []tls.Certificate{cck},
+			RootCAs:      caCertPool,
+		}
+		tlsConfig.BuildNameToCertificate()
+	}
+
+	if err != nil {
+		os.Remove(tempPemFile.Name())
+		return ingress.SSLCert{}, err
+	}
+
+	err = os.Rename(tempPemFile.Name(), pemFileName)
+	if err != nil {
+		os.Remove(tempPemFile.Name())
+		return ingress.SSLCert{}, fmt.Errorf("Couldn't move temp pem file %v to destination %v: %v", tempPemFile.Name(), pemFileName, err)
 	}
 
 	return ingress.SSLCert{
@@ -70,34 +115,6 @@ func AddOrUpdateCertAndKey(name string, cert string, key string) (ingress.SSLCer
 		PemSHA:       pemSHA1(pemFileName),
 		CN:           cn,
 	}, nil
-}
-
-// commonNames checks if the certificate and key file are valid
-// returning the result of the validation and the list of hostnames
-// contained in the common name/s
-func commonNames(pemFileName string) ([]string, error) {
-	pemCerts, err := ioutil.ReadFile(pemFileName)
-	if err != nil {
-		return []string{}, err
-	}
-
-	block, _ := pem.Decode(pemCerts)
-	if block == nil {
-		return []string{}, fmt.Errorf("No valid PEM formatted block found")
-	}
-
-	cert, err := x509.ParseCertificate(block.Bytes)
-	if err != nil {
-		return []string{}, err
-	}
-
-	cn := []string{cert.Subject.CommonName}
-	if len(cert.DNSNames) > 0 {
-		cn = append(cn, cert.DNSNames...)
-	}
-
-	glog.V(3).Infof("found %v common names: %v\n", cn, len(cn))
-	return cn, nil
 }
 
 // SearchDHParamFile iterates all the secrets mounted inside the /etc/nginx-ssl directory

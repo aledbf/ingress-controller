@@ -27,11 +27,11 @@ push: container
 
 fmt:
 	@echo "+ $@"
-	@gofmt -s -l . | grep -v vendor | tee /dev/stderr
+	@go list -f '{{if len .TestGoFiles}}"gofmt -s -l {{.Dir}}"{{end}}' $(shell go list ${PKG}/... | grep -v vendor) | xargs -L 1 sh -c
 
 lint:
 	@echo "+ $@"
-	@golint ${PKG}/... | grep -v vendor | tee /dev/stderr
+	@go list -f '{{if len .TestGoFiles}}"golint {{.Dir}}/..."{{end}}' $(shell go list ${PKG}/... | grep -v vendor) | xargs -L 1 sh -c
 
 test: fmt lint vet
 	@echo "+ $@"
