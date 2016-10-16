@@ -38,6 +38,18 @@ func IsValidService(kubeClient *unversioned.Client, nsName string) (*api.Service
 	return kubeClient.Services(ns).Get(name)
 }
 
+func IsValidSecret(kubeClient *unversioned.Client, nsName string) (*api.Secret, error) {
+	if nsName == "" {
+		return nil, fmt.Errorf("empty string is not a valid service name")
+	}
+
+	ns, name, err := ParseNameNS(nsName)
+	if err != nil {
+		return nil, err
+	}
+	return kubeClient.Secrets(ns).Get(name)
+}
+
 // ParseNameNS ...
 func ParseNameNS(input string) (string, string, error) {
 	nsName := strings.Split(input, "/")

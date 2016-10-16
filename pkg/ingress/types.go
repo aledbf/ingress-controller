@@ -122,6 +122,8 @@ func (c LocationByPath) Less(i, j int) bool {
 type SSLCert struct {
 	CertFileName string
 	KeyFileName  string
+	CAFileName   string
+
 	// PemFileName contains the path to the file with the certificate and key concatenated
 	PemFileName string
 	// PemSHA contains the sha1 of the pem file.
