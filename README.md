@@ -1,7 +1,6 @@
 
 [![Build Status](https://travis-ci.org/aledbf/ingress-controller.svg?branch=master)](https://travis-ci.org/aledbf/ingress-controller)
-[![Coverage Status](https://coveralls.io/repos/aledbf/ingress-controller/badge.svg?branch=master&service=github)](https://coveralls.io/github/aledbf/ingress-controller?branch=master)
-
+[![Coverage Status](https://coveralls.io/repos/github/aledbf/ingress-controller/badge.svg?branch=master)](https://coveralls.io/github/aledbf/ingress-controller?branch=master)
 
 # Nginx Ingress Controller
 
