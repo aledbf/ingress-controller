@@ -20,6 +20,7 @@ import (
 	"github.com/aledbf/ingress-controller/pkg/ingress/annotations/auth"
 	"github.com/aledbf/ingress-controller/pkg/ingress/annotations/authreq"
 	"github.com/aledbf/ingress-controller/pkg/ingress/annotations/ipwhitelist"
+	"github.com/aledbf/ingress-controller/pkg/ingress/annotations/proxy"
 	"github.com/aledbf/ingress-controller/pkg/ingress/annotations/ratelimit"
 	"github.com/aledbf/ingress-controller/pkg/ingress/annotations/rewrite"
 )
@@ -104,6 +105,7 @@ type Location struct {
 	Whitelist       ipwhitelist.SourceRange
 	EnableCORS      bool
 	ExternalAuth    authreq.External
+	Proxy           proxy.Configuration
 }
 
 // LocationByPath sorts location by path
