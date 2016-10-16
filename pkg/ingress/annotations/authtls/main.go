@@ -30,35 +30,35 @@ const (
 	authTLSSecret = "ingress.kubernetes.io/auth-tls-secret"
 )
 
-// TLS returns external authentication configuration for an Ingress rule
-type TLS struct {
-	Namespace string
-	Name      string
+// SSLCert returns external authentication configuration for an Ingress rule
+type SSLCert struct {
+	CertFileName string
+	KeyFileName  string
+	CAFileName   string
+	PemSHA       string
 }
 
 // ParseAnnotations parses the annotations contained in the ingress
 // rule used to use an external URL as source for authentication
-func ParseAnnotations(ing *extensions.Ingress) (TLS, error) {
+func ParseAnnotations(ing *extensions.Ingress,
+	fn func(secret string) (*SSLCert, error)) (*SSLCert, error) {
 	if ing.GetAnnotations() == nil {
-		return TLS{}, parser.ErrMissingAnnotations
+		return nil, parser.ErrMissingAnnotations
 	}
 
 	str, err := parser.GetStringAnnotation(authTLSSecret, ing)
 	if err != nil {
-		return TLS{}, err
+		return nil, err
 	}
 
 	if str == "" {
-		return TLS{}, fmt.Errorf("an empty string is not a valid secret name")
+		return nil, fmt.Errorf("an empty string is not a valid secret name")
 	}
 
-	ns, name, err := k8s.ParseNameNS(str)
+	_, _, err = k8s.ParseNameNS(str)
 	if err != nil {
-		return TLS{}, err
+		return nil, err
 	}
 
-	return TLS{
-		Name:      "",
-		Namespace: "",
-	}, nil
+	return fn(str)
 }

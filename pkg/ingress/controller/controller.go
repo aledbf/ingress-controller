@@ -44,6 +44,7 @@ import (
 	"github.com/aledbf/ingress-controller/pkg/ingress"
 	"github.com/aledbf/ingress-controller/pkg/ingress/annotations/auth"
 	"github.com/aledbf/ingress-controller/pkg/ingress/annotations/authreq"
+	"github.com/aledbf/ingress-controller/pkg/ingress/annotations/authtls"
 	"github.com/aledbf/ingress-controller/pkg/ingress/annotations/cors"
 	"github.com/aledbf/ingress-controller/pkg/ingress/annotations/healthcheck"
 	"github.com/aledbf/ingress-controller/pkg/ingress/annotations/ipwhitelist"
@@ -232,22 +233,34 @@ func NewLoadBalancer(config *Configuration) (IngressController, error) {
 
 	ic.ingLister.Store, ic.ingController = cache.NewInformer(
 		&cache.ListWatch{
-			ListFunc:  ic.ingressListFunc(),
-			WatchFunc: ic.ingressWatchFunc(),
+			ListFunc: func(opts api.ListOptions) (runtime.Object, error) {
+				return ic.cfg.Client.Extensions().Ingress(ic.cfg.Namespace).List(opts)
+			},
+			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+				return ic.cfg.Client.Extensions().Ingress(ic.cfg.Namespace).Watch(options)
+			},
 		},
 		&extensions.Ingress{}, ic.cfg.ResyncPeriod, ingEventHandler)
 
 	ic.endpLister.Store, ic.endpController = cache.NewInformer(
 		&cache.ListWatch{
-			ListFunc:  ic.endpointsListFunc(),
-			WatchFunc: ic.endpointsWatchFunc(),
+			ListFunc: func(opts api.ListOptions) (runtime.Object, error) {
+				return ic.cfg.Client.Endpoints(ic.cfg.Namespace).List(opts)
+			},
+			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+				return ic.cfg.Client.Endpoints(ic.cfg.Namespace).Watch(options)
+			},
 		},
 		&api.Endpoints{}, ic.cfg.ResyncPeriod, eventHandler)
 
 	ic.svcLister.Indexer, ic.svcController = cache.NewIndexerInformer(
 		&cache.ListWatch{
-			ListFunc:  ic.serviceListFunc(),
-			WatchFunc: ic.serviceWatchFunc(),
+			ListFunc: func(opts api.ListOptions) (runtime.Object, error) {
+				return ic.cfg.Client.Services(ic.cfg.Namespace).List(opts)
+			},
+			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+				return ic.cfg.Client.Services(ic.cfg.Namespace).Watch(options)
+			},
 		},
 		&api.Service{},
 		ic.cfg.ResyncPeriod,
@@ -256,15 +269,23 @@ func NewLoadBalancer(config *Configuration) (IngressController, error) {
 
 	ic.secrLister.Store, ic.secrController = cache.NewInformer(
 		&cache.ListWatch{
-			ListFunc:  ic.secretsListFunc(),
-			WatchFunc: ic.secretsWatchFunc(),
+			ListFunc: func(opts api.ListOptions) (runtime.Object, error) {
+				return ic.cfg.Client.Secrets(ic.cfg.Namespace).List(opts)
+			},
+			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+				return ic.cfg.Client.Secrets(ic.cfg.Namespace).Watch(options)
+			},
 		},
 		&api.Secret{}, ic.cfg.ResyncPeriod, secrEventHandler)
 
 	ic.mapLister.Store, ic.mapController = cache.NewInformer(
 		&cache.ListWatch{
-			ListFunc:  ic.mapListFunc(),
-			WatchFunc: ic.mapWatchFunc(),
+			ListFunc: func(opts api.ListOptions) (runtime.Object, error) {
+				return ic.cfg.Client.ConfigMaps(ic.cfg.Namespace).List(opts)
+			},
+			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+				return ic.cfg.Client.ConfigMaps(ic.cfg.Namespace).Watch(options)
+			},
 		},
 		&api.ConfigMap{}, ic.cfg.ResyncPeriod, mapEventHandler)
 
@@ -277,66 +298,6 @@ func NewLoadBalancer(config *Configuration) (IngressController, error) {
 	ic.syncQueue = task.NewTaskQueue(ic.sync)
 
 	return ic, nil
-}
-
-func (ic *GenericController) ingressListFunc() func(api.ListOptions) (runtime.Object, error) {
-	return func(opts api.ListOptions) (runtime.Object, error) {
-		return ic.cfg.Client.Extensions().Ingress(ic.cfg.Namespace).List(opts)
-	}
-}
-
-func (ic *GenericController) ingressWatchFunc() func(options api.ListOptions) (watch.Interface, error) {
-	return func(options api.ListOptions) (watch.Interface, error) {
-		return ic.cfg.Client.Extensions().Ingress(ic.cfg.Namespace).Watch(options)
-	}
-}
-
-func (ic *GenericController) serviceListFunc() func(api.ListOptions) (runtime.Object, error) {
-	return func(opts api.ListOptions) (runtime.Object, error) {
-		return ic.cfg.Client.Services(ic.cfg.Namespace).List(opts)
-	}
-}
-
-func (ic *GenericController) serviceWatchFunc() func(options api.ListOptions) (watch.Interface, error) {
-	return func(options api.ListOptions) (watch.Interface, error) {
-		return ic.cfg.Client.Services(ic.cfg.Namespace).Watch(options)
-	}
-}
-
-func (ic *GenericController) endpointsListFunc() func(api.ListOptions) (runtime.Object, error) {
-	return func(opts api.ListOptions) (runtime.Object, error) {
-		return ic.cfg.Client.Endpoints(ic.cfg.Namespace).List(opts)
-	}
-}
-
-func (ic *GenericController) endpointsWatchFunc() func(options api.ListOptions) (watch.Interface, error) {
-	return func(options api.ListOptions) (watch.Interface, error) {
-		return ic.cfg.Client.Endpoints(ic.cfg.Namespace).Watch(options)
-	}
-}
-
-func (ic *GenericController) secretsListFunc() func(api.ListOptions) (runtime.Object, error) {
-	return func(opts api.ListOptions) (runtime.Object, error) {
-		return ic.cfg.Client.Secrets(ic.cfg.Namespace).List(opts)
-	}
-}
-
-func (ic *GenericController) secretsWatchFunc() func(options api.ListOptions) (watch.Interface, error) {
-	return func(options api.ListOptions) (watch.Interface, error) {
-		return ic.cfg.Client.Secrets(ic.cfg.Namespace).Watch(options)
-	}
-}
-
-func (ic *GenericController) mapListFunc() func(api.ListOptions) (runtime.Object, error) {
-	return func(opts api.ListOptions) (runtime.Object, error) {
-		return ic.cfg.Client.ConfigMaps(ic.cfg.Namespace).List(opts)
-	}
-}
-
-func (ic *GenericController) mapWatchFunc() func(options api.ListOptions) (watch.Interface, error) {
-	return func(options api.ListOptions) (watch.Interface, error) {
-		return ic.cfg.Client.ConfigMaps(ic.cfg.Namespace).Watch(options)
-	}
 }
 
 func (ic *GenericController) controllersInSync() bool {
@@ -610,6 +571,12 @@ func (ic *GenericController) getUpstreamServers(ngxCfg config.Configuration, dat
 		prx := proxy.ParseAnnotations(ngxCfg, ing)
 		glog.V(3).Infof("nginx proxy timeouts %v", prx)
 
+		certAuth, err := authtls.ParseAnnotations(ing, ic.getAuthCertificate)
+		glog.V(3).Infof("nginx auth request %v", certAuth)
+		if err != nil {
+			glog.V(3).Infof("error reading certificate auth annotation in Ingress %v/%v: %v", ing.GetNamespace(), ing.GetName(), err)
+		}
+
 		for _, rule := range ing.Spec.Rules {
 			host := rule.Host
 			if host == "" {
@@ -668,6 +635,7 @@ func (ic *GenericController) getUpstreamServers(ngxCfg config.Configuration, dat
 						loc.EnableCORS = eCORS
 						loc.ExternalAuth = ra
 						loc.Proxy = *prx
+						loc.CertificateAuth = *certAuth
 
 						addLoc = false
 						continue
@@ -693,6 +661,7 @@ func (ic *GenericController) getUpstreamServers(ngxCfg config.Configuration, dat
 						EnableCORS:      eCORS,
 						ExternalAuth:    ra,
 						Proxy:           *prx,
+						CertificateAuth: *certAuth,
 					})
 				}
 			}
@@ -721,6 +690,20 @@ func (ic *GenericController) getUpstreamServers(ngxCfg config.Configuration, dat
 	sort.Sort(ingress.ServerByName(aServers))
 
 	return aUpstreams, aServers
+}
+
+func (ic *GenericController) getAuthCertificate(secretName string) (*authtls.SSLCert, error) {
+	cert, err := ic.getPemCertificate(secretName)
+	if err != nil {
+		return nil, err
+	}
+
+	return &authtls.SSLCert{
+		CertFileName: cert.CertFileName,
+		KeyFileName:  cert.KeyFileName,
+		CAFileName:   cert.CAFileName,
+		PemSHA:       cert.PemSHA,
+	}, nil
 }
 
 // createUpstreams creates the NGINX upstreams for each service referenced in
@@ -822,7 +805,7 @@ func (ic *GenericController) createServers(data []interface{}, upstreams map[str
 	if ic.cfg.DefaultSSLCertificate == "" {
 		// use system certificated generated at image build time
 		cert, key := ssl.GetFakeSSLCert()
-		ngxCert, err = ssl.AddOrUpdateCertAndKey("system-snake-oil-certificate", cert, key)
+		ngxCert, err = ssl.AddOrUpdateCertAndKey("system-snake-oil-certificate", cert, key, "")
 	} else {
 		ngxCert, err = ic.getPemCertificate(ic.cfg.DefaultSSLCertificate)
 	}
@@ -939,8 +922,10 @@ func (ic *GenericController) getPemCertificate(secretName string) (ingress.SSLCe
 		return ingress.SSLCert{}, fmt.Errorf("Secret %v has no cert", secretName)
 	}
 
+	ca := secret.Data["ca.crt"]
+
 	nsSecName := strings.Replace(secretName, "/", "-", -1)
-	return ssl.AddOrUpdateCertAndKey(nsSecName, string(cert), string(key))
+	return ssl.AddOrUpdateCertAndKey(nsSecName, string(cert), string(key), string(ca))
 }
 
 // check if secret is referenced in this controller's config

@@ -229,6 +229,15 @@ http {
             allow {{ $ip }};{{ end }}
             deny all;
             {{ end -}}
+
+            {{- if not (empty $location.CertificateAuth.KeyFileName) }}
+            # PEM sha: {{ $location.CertificateAuth.PemSHA }}
+            ssl_certificate      {{ $location.CertificateAuth.CertFileName }};
+            ssl_certificate_key  {{ $location.CertificateAuth.KeyFileName }};
+            ssl_client_certificate {{ $location.CertificateAuth.CAFileName }};
+            ssl_verify_client on;
+            {{ end -}}
+            
             {{- if not (empty $authPath) }}
             # this location requires authentication
             auth_request {{ $authPath }};

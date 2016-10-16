@@ -38,6 +38,7 @@ func IsValidService(kubeClient *unversioned.Client, nsName string) (*api.Service
 	return kubeClient.Services(ns).Get(name)
 }
 
+// IsValidSecret ...
 func IsValidSecret(kubeClient *unversioned.Client, nsName string) (*api.Secret, error) {
 	if nsName == "" {
 		return nil, fmt.Errorf("empty string is not a valid service name")
