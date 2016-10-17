@@ -43,21 +43,21 @@ type SSLCert struct {
 func ParseAnnotations(ing *extensions.Ingress,
 	fn func(secret string) (*SSLCert, error)) (*SSLCert, error) {
 	if ing.GetAnnotations() == nil {
-		return nil, parser.ErrMissingAnnotations
+		return &SSLCert{}, parser.ErrMissingAnnotations
 	}
 
 	str, err := parser.GetStringAnnotation(authTLSSecret, ing)
 	if err != nil {
-		return nil, err
+		return &SSLCert{}, err
 	}
 
 	if str == "" {
-		return nil, fmt.Errorf("an empty string is not a valid secret name")
+		return &SSLCert{}, fmt.Errorf("an empty string is not a valid secret name")
 	}
 
 	_, _, err = k8s.ParseNameNS(str)
 	if err != nil {
-		return nil, err
+		return &SSLCert{}, err
 	}
 
 	return fn(str)

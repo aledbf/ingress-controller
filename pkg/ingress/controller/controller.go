@@ -526,55 +526,55 @@ func (ic *GenericController) getDefaultUpstream() *ingress.Upstream {
 // An upstream can be used in multiple servers if the namespace, service name and port are the same
 func (ic *GenericController) getUpstreamServers(ngxCfg config.Configuration, data []interface{}) ([]*ingress.Upstream, []*ingress.Server) {
 	upstreams := ic.createUpstreams(ngxCfg, data)
-	servers := ic.createServers(data, upstreams)
+	servers := ic.createServers(ngxCfg, data, upstreams)
 
 	for _, ingIf := range data {
 		ing := ingIf.(*extensions.Ingress)
 
 		nginxAuth, err := auth.ParseAnnotations(ic.cfg.Client, ing, auth.DefAuthDirectory)
-		glog.V(3).Infof("nginx auth %v", nginxAuth)
+		glog.V(5).Infof("nginx auth %v", nginxAuth)
 		if err != nil {
-			glog.V(3).Infof("error reading authentication in Ingress %v/%v: %v", ing.GetNamespace(), ing.GetName(), err)
+			glog.V(5).Infof("error reading authentication in Ingress %v/%v: %v", ing.GetNamespace(), ing.GetName(), err)
 		}
 
 		rl, err := ratelimit.ParseAnnotations(ing)
-		glog.V(3).Infof("nginx rate limit %v", rl)
+		glog.V(5).Infof("nginx rate limit %v", rl)
 		if err != nil {
-			glog.V(3).Infof("error reading rate limit annotation in Ingress %v/%v: %v", ing.GetNamespace(), ing.GetName(), err)
+			glog.V(5).Infof("error reading rate limit annotation in Ingress %v/%v: %v", ing.GetNamespace(), ing.GetName(), err)
 		}
 
 		secUpstream, err := secureupstream.ParseAnnotations(ing)
 		if err != nil {
-			glog.V(3).Infof("error reading secure upstream in Ingress %v/%v: %v", ing.GetNamespace(), ing.GetName(), err)
+			glog.V(5).Infof("error reading secure upstream in Ingress %v/%v: %v", ing.GetNamespace(), ing.GetName(), err)
 		}
 
 		locRew, err := rewrite.ParseAnnotations(ngxCfg, ing)
 		if err != nil {
-			glog.V(3).Infof("error parsing rewrite annotations for Ingress rule %v/%v: %v", ing.GetNamespace(), ing.GetName(), err)
+			glog.V(5).Infof("error parsing rewrite annotations for Ingress rule %v/%v: %v", ing.GetNamespace(), ing.GetName(), err)
 		}
 
 		wl, err := ipwhitelist.ParseAnnotations(ngxCfg.WhitelistSourceRange, ing)
-		glog.V(3).Infof("nginx white list %v", wl)
+		glog.V(5).Infof("nginx white list %v", wl)
 		if err != nil {
-			glog.V(3).Infof("error reading white list annotation in Ingress %v/%v: %v", ing.GetNamespace(), ing.GetName(), err)
+			glog.V(5).Infof("error reading white list annotation in Ingress %v/%v: %v", ing.GetNamespace(), ing.GetName(), err)
 		}
 
 		eCORS, err := cors.ParseAnnotations(ing)
 		if err != nil {
-			glog.V(3).Infof("error reading CORS annotation in Ingress %v/%v: %v", ing.GetNamespace(), ing.GetName(), err)
+			glog.V(5).Infof("error reading CORS annotation in Ingress %v/%v: %v", ing.GetNamespace(), ing.GetName(), err)
 		}
 
 		ra, err := authreq.ParseAnnotations(ing)
 		glog.V(3).Infof("nginx auth request %v", ra)
 		if err != nil {
-			glog.V(3).Infof("error reading auth request annotation in Ingress %v/%v: %v", ing.GetNamespace(), ing.GetName(), err)
+			glog.V(5).Infof("error reading auth request annotation in Ingress %v/%v: %v", ing.GetNamespace(), ing.GetName(), err)
 		}
 
 		prx := proxy.ParseAnnotations(ngxCfg, ing)
-		glog.V(3).Infof("nginx proxy timeouts %v", prx)
+		glog.V(5).Infof("nginx proxy timeouts %v", prx)
 
 		certAuth, err := authtls.ParseAnnotations(ing, ic.getAuthCertificate)
-		glog.V(3).Infof("nginx auth request %v", certAuth)
+		glog.V(5).Infof("nginx auth request %v", certAuth)
 		if err != nil {
 			glog.V(3).Infof("error reading certificate auth annotation in Ingress %v/%v: %v", ing.GetNamespace(), ing.GetName(), err)
 		}
@@ -697,7 +697,7 @@ func (ic *GenericController) getUpstreamServers(ngxCfg config.Configuration, dat
 func (ic *GenericController) getAuthCertificate(secretName string) (*authtls.SSLCert, error) {
 	cert, err := ic.getPemCertificate(secretName)
 	if err != nil {
-		return nil, err
+		return &authtls.SSLCert{}, err
 	}
 
 	return &authtls.SSLCert{
@@ -796,7 +796,7 @@ func (ic *GenericController) getSvcEndpoints(svcKey, backendPort string,
 	return upstreams, nil
 }
 
-func (ic *GenericController) createServers(data []interface{}, upstreams map[string]*ingress.Upstream) map[string]*ingress.Server {
+func (ic *GenericController) createServers(ngxCfg config.Configuration, data []interface{}, upstreams map[string]*ingress.Upstream) map[string]*ingress.Server {
 	servers := make(map[string]*ingress.Server)
 
 	pems := ic.getPemsFromIngress(data)
@@ -812,11 +812,14 @@ func (ic *GenericController) createServers(data []interface{}, upstreams map[str
 		ngxCert, err = ic.getPemCertificate(ic.cfg.DefaultSSLCertificate)
 	}
 
+	ngxProxy := *proxy.ParseAnnotations(ngxCfg, nil)
+
 	locs := []*ingress.Location{}
 	locs = append(locs, &ingress.Location{
 		Path:         rootLocation,
 		IsDefBackend: true,
 		Upstream:     *ic.getDefaultUpstream(),
+		Proxy:        ngxProxy,
 	})
 	servers[defServerName] = &ingress.Server{Name: defServerName, Locations: locs}
 
@@ -847,6 +850,7 @@ func (ic *GenericController) createServers(data []interface{}, upstreams map[str
 					Path:         rootLocation,
 					IsDefBackend: true,
 					Upstream:     *ic.getDefaultUpstream(),
+					Proxy:        ngxProxy,
 				}
 
 				if ing.Spec.Backend != nil {

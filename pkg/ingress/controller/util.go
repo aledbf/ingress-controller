@@ -79,5 +79,9 @@ func IsValidClass(ing *extensions.Ingress, class string) bool {
 	}
 
 	cc, _ := parser.GetStringAnnotation(ingressClassKey, ing)
+	if cc == "" {
+		return true
+	}
+
 	return cc == class
 }

@@ -5,6 +5,7 @@ BUILDTAGS=
 # 0.0 shouldn't clobber any release builds
 RELEASE = 0.9
 PREFIX = quay.io/aledbf/nginx-ingress-controller
+GOOS?=linux
 
 REPO_INFO=$(shell git config --get remote.origin.url)
 
@@ -15,11 +16,11 @@ endif
 PKG := "github.com/aledbf/ingress-controller"
 
 build: clean
-	CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo \
+	CGO_ENABLED=0 GOOS=${GOOS} go build -a -installsuffix cgo \
 		-ldflags "-s -w -X ${PKG}/pkg/version.RELEASE=${RELEASE} -X ${PKG}/pkg/version.COMMIT=${COMMIT} -X ${PKG}/pkg/version.REPO=${REPO_INFO}" \
 		-o nginx-ingress-controller ${PKG}/pkg/cmd/controller 
 
-container: controller
+container: build
 	docker build -t $(PREFIX):$(RELEASE) .
 
 push: container

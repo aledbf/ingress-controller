@@ -26,6 +26,7 @@ import (
 type fileWatcher struct {
 	file    string
 	watcher *fsnotify.Watcher
+	// onEvent callback to be invoked after the file being watched changes
 	onEvent func()
 }
 
