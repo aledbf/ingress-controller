@@ -8,6 +8,7 @@
 This is an nginx Ingress controller that uses [ConfigMap](https://github.com/kubernetes/kubernetes/blob/master/docs/design/configmap.md) to store the nginx configuration. See [Ingress controller documentation](../README.md) for details on how it works.
 
 ## Contents
+* [Recent changes](#recent-changes)
 * [Conventions](#conventions)
 * [Requirements](#what-it-provides)
 * [Dry running](#dry-running-the-ingress-controller)
@@ -34,6 +35,11 @@ This is an nginx Ingress controller that uses [ConfigMap](https://github.com/kub
 * [Why endpoints and not services?](#why-endpoints-and-not-services)
 * [Limitations](#limitations)
 * [NGINX Notes](#nginx-notes)
+
+## Recent changes
+
+Change history is available in [CHANGELOG.md](CHANGELOG.md)
+
 
 ## Conventions
 

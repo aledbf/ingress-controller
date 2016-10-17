@@ -10,12 +10,11 @@ notifications:
 
 go:
   - 1.7
-  - tip
 
 env:
   global:
   - ETCD_VERSION=3.0.12
-  - K8S_VERSION=1.4.2
+  - K8S_VERSION=1.4.3
 
 before_install:
   - sudo bash -c 'sysctl net.ipv6.conf.all.disable_ipv6=0'
