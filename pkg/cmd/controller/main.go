@@ -33,6 +33,7 @@ import (
 	"github.com/aledbf/ingress-controller/pkg/k8s"
 	"github.com/aledbf/ingress-controller/pkg/version"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"k8s.io/kubernetes/pkg/api"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/restclient"
@@ -196,6 +197,8 @@ func main() {
 func registerHandlers(enableProfiling bool, port int, ic controller.IngressController) {
 	mux := http.NewServeMux()
 	healthz.InstallHandler(mux, ic.Check())
+
+	mux.Handle("/metrics", prometheus.Handler())
 
 	mux.HandleFunc("/build", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)

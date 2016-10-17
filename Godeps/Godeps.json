@@ -7,6 +7,11 @@
 	],
 	"Deps": [
 		{
+			"ImportPath": "bitbucket.org/ww/goautoneg",
+			"Comment": "null-5",
+			"Rev": "'75cd24fc2f2c2a2088577d12123ddee5f54e0675'"
+		},
+		{
 			"ImportPath": "cloud.google.com/go/compute/metadata",
 			"Comment": "v0.1.0-115-g3b1ae45",
 			"Rev": "3b1ae45394a234c385be014e9a488f2bb6eef821"
@@ -24,6 +29,10 @@
 		{
 			"ImportPath": "github.com/PuerkitoBio/urlesc",
 			"Rev": "5bd2802263f21d8788851d5305584c82a5c75d7e"
+		},
+		{
+			"ImportPath": "github.com/beorn7/perks/quantile",
+			"Rev": "3ac7bf7a47d159a033b107610db8a1b6575507a4"
 		},
 		{
 			"ImportPath": "github.com/blang/semver",
@@ -242,12 +251,38 @@
 			"Rev": "d5b7844b561a7bc640052f1b935f7b800330d7e0"
 		},
 		{
+			"ImportPath": "github.com/matttproud/golang_protobuf_extensions/pbutil",
+			"Rev": "fc2b8d3a73c4867e51861bbdd5ae3c1f0869dd6a"
+		},
+		{
 			"ImportPath": "github.com/mitchellh/mapstructure",
 			"Rev": "740c764bc6149d3f1806231418adb9f52c11bcbf"
 		},
 		{
 			"ImportPath": "github.com/pborman/uuid",
 			"Rev": "ca53cad383cad2479bbba7f7a1a05797ec1386e4"
+		},
+		{
+			"ImportPath": "github.com/prometheus/client_golang/prometheus",
+			"Comment": "0.7.0-52-ge51041b",
+			"Rev": "e51041b3fa41cece0dca035740ba6411905be473"
+		},
+		{
+			"ImportPath": "github.com/prometheus/client_model/go",
+			"Comment": "model-0.0.2-12-gfa8ad6f",
+			"Rev": "fa8ad6fec33561be4280a8f0514318c79d7f6cb6"
+		},
+		{
+			"ImportPath": "github.com/prometheus/common/expfmt",
+			"Rev": "ffe929a3f4c4faeaa10f2b9535c2b1be3ad15650"
+		},
+		{
+			"ImportPath": "github.com/prometheus/common/model",
+			"Rev": "ffe929a3f4c4faeaa10f2b9535c2b1be3ad15650"
+		},
+		{
+			"ImportPath": "github.com/prometheus/procfs",
+			"Rev": "454a56f35412459b5e684fd5ec0f9211b94f002a"
 		},
 		{
 			"ImportPath": "github.com/spf13/cobra",
