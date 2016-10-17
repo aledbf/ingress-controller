@@ -119,6 +119,7 @@ type Configuration struct {
 
 	ResyncPeriod          time.Duration
 	DefaultService        string
+	IngressClass          string
 	Namespace             string
 	NginxConfigMapName    string
 	TCPConfigMapName      string
@@ -148,7 +149,7 @@ func NewLoadBalancer(config *Configuration) (IngressController, error) {
 	ingEventHandler := cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			addIng := obj.(*extensions.Ingress)
-			if !isNGINXIngress(addIng) {
+			if !IsValidClass(addIng, config.IngressClass) {
 				glog.Infof("Ignoring add for ingress %v based on annotation %v", addIng.Name, ingressClassKey)
 				return
 			}
@@ -157,7 +158,7 @@ func NewLoadBalancer(config *Configuration) (IngressController, error) {
 		},
 		DeleteFunc: func(obj interface{}) {
 			delIng := obj.(*extensions.Ingress)
-			if !isNGINXIngress(delIng) {
+			if !IsValidClass(delIng, config.IngressClass) {
 				glog.Infof("Ignoring add for ingress %v based on annotation %v", delIng.Name, ingressClassKey)
 				return
 			}
@@ -166,9 +167,10 @@ func NewLoadBalancer(config *Configuration) (IngressController, error) {
 		},
 		UpdateFunc: func(old, cur interface{}) {
 			curIng := cur.(*extensions.Ingress)
-			if !isNGINXIngress(curIng) {
+			if !IsValidClass(curIng, config.IngressClass) {
 				return
 			}
+
 			if !reflect.DeepEqual(old, cur) {
 				upIng := cur.(*extensions.Ingress)
 				ic.recorder.Eventf(upIng, api.EventTypeNormal, "UPDATE", fmt.Sprintf("%s/%s", upIng.Namespace, upIng.Name))
