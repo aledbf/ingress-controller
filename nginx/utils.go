@@ -136,13 +136,13 @@ func (ngx *Manager) filterErrors(errCodes []int) []int {
 
 func (ngx *Manager) needsReload(data []byte) (bool, error) {
 	filename := ngx.ConfigFile
+
 	in, err := os.Open(filename)
 	if err != nil {
 		return false, err
 	}
-
+	defer in.Close()
 	src, err := ioutil.ReadAll(in)
-	in.Close()
 	if err != nil {
 		return false, err
 	}

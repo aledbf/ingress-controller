@@ -38,7 +38,8 @@ const (
 )
 
 var (
-	camelRegexp = regexp.MustCompile("[0-9A-Za-z]+")
+	camelRegexp        = regexp.MustCompile("[0-9A-Za-z]+")
+	multipleBlankLines = regexp.MustCompile("(\\s{5,}\n|\n){2,}")
 
 	funcMap = text_template.FuncMap{
 		"empty": func(input interface{}) bool {
@@ -146,17 +147,19 @@ func (t *Template) Write(
 
 	buffer := new(bytes.Buffer)
 	err := t.tmpl.Execute(buffer, conf)
+	//
+	content := multipleBlankLines.ReplaceAllLiteral(buffer.Bytes(), []byte("\n\n"))
 	if err != nil {
-		glog.V(3).Infof("%v", string(buffer.Bytes()))
+		glog.V(3).Infof("%v", string(content))
 		return nil, err
 	}
 
-	err = isValidTemplate(buffer.Bytes())
+	err = isValidTemplate(content)
 	if err != nil {
 		return nil, err
 	}
 
-	return buffer.Bytes(), nil
+	return content, nil
 }
 
 func fixKeyNames(data map[string]interface{}) map[string]interface{} {
