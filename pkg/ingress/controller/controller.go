@@ -417,8 +417,8 @@ func (ic *GenericController) getStreamServices(data map[string]string, proto api
 		}
 
 		// this ports are required for NGINX
-		if k == "80" || k == "443" || k == "8181" {
-			glog.Warningf("port %v cannot be used for TCP or UDP services. Is reserved for NGINX", k)
+		if k == "80" || k == "443" || k == "8181" || k == "18080" {
+			glog.Warningf("port %v cannot be used for TCP or UDP services. It is reserved for NGINX", k)
 			continue
 		}
 

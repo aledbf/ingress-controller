@@ -337,7 +337,7 @@ http {
         # https://github.com/kubernetes/contrib/blob/master/ingress/controllers/nginx/nginx/command.go#L104
         listen 18080 default_server reuseport backlog={{ .backlogSize }};
 
-        location /healthz {
+        location {{ $cfg.HealthzURL }} {
             access_log off;
             return 200;
         }

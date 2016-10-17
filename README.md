@@ -12,6 +12,7 @@ This is an nginx Ingress controller that uses [ConfigMap](https://github.com/kub
 * [Requirements](#what-it-provides)
 * [Dry running](#dry-running-the-ingress-controller)
 * [Deployment](#deployment)
+* [Health checks](#health-checks)
 * [HTTP](#http)
 * [HTTPS](#https)
   * [Default SSL Certificate](#default-ssl-certificate)
@@ -68,6 +69,15 @@ Loadbalancers are created via a ReplicationController or Daemonset:
 ```
 $ kubectl create -f examples/default/rc-default.yaml
 ```
+
+## Health checks
+
+The proveded examples in the Ingress controller use a `readiness` and `liveness` probe. By default the URL is `/healthz` and the port `18080`. 
+Using the flag `--health-check-path` is possible to specify a custom path.
+In some environments only port 80 is allowed to enable health checks. For this reason the Ingress controller exposes this path in the default server.
+
+If PROXY protocol is enabled the health check must use the default port `18080`. This is required because Kubernetes probes do not understand PROXY protocol.
+
 
 ## HTTP
 

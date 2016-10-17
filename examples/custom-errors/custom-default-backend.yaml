@@ -6,7 +6,7 @@ metadata:
     app: nginx-errors
 spec:
   ports:
-  - port: 80
+  - port: 18080
     targetPort: 80
     protocol: TCP
     name: http

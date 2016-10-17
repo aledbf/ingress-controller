@@ -26,13 +26,13 @@ spec:
         imagePullPolicy: Always
         readinessProbe:
           httpGet:
-            path: /ingress-controller-healthz
-            port: 80
+            path: /healthz
+            port: 18080
             scheme: HTTP
         livenessProbe:
           httpGet:
-            path: /ingress-controller-healthz
-            port: 80
+            path: /healthz
+            port: 18080
             scheme: HTTP
           initialDelaySeconds: 10
           timeoutSeconds: 1
