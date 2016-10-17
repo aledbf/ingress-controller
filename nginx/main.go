@@ -106,6 +106,7 @@ func NewManager(kubeClient *client.Client) *Manager {
 	}
 
 	ngx.template = template
+
 	return ngx
 }
 

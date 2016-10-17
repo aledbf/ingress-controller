@@ -76,9 +76,11 @@ func (ngx *Manager) CheckAndReload(cfg config.Configuration, ingressCfg ingress.
 
 	if changed {
 		if err := ngx.shellOut("nginx -s reload"); err != nil {
+			reloadOperationsErrors.WithLabelValues(ReloadOperationsError).Inc()
 			return fmt.Errorf("error reloading nginx: %v", err)
 		}
 
+		reloadOperations.WithLabelValues(ReloadOperations).Inc()
 		glog.Info("change in configuration detected. Reloading...")
 	}
 
