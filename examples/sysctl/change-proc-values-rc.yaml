@@ -6,7 +6,7 @@ metadata:
     k8s-app: default-http-backend
 spec:
   ports:
-  - port: 80
+  - port: 18080
     targetPort: 8080
     protocol: TCP
     name: http
@@ -94,13 +94,13 @@ spec:
         imagePullPolicy: Always
         readinessProbe:
           httpGet:
-            path: /ingress-controller-healthz
-            port: 80
+            path: /healthz
+            port: 18080
             scheme: HTTP
         livenessProbe:
           httpGet:
-            path: /ingress-controller-healthz
-            port: 80
+            path: /healthz
+            port: 18080
             scheme: HTTP
           initialDelaySeconds: 10
           timeoutSeconds: 1
