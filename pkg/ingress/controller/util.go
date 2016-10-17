@@ -70,9 +70,14 @@ func isDefaultUpstream(ups *ingress.Upstream) bool {
 		ups.Backends[0].Port == "8181"
 }
 
-// isNGINXIngress returns true if the given Ingress either doesn't specify the
-// ingress.class annotation, or it's set to "nginx".
-func isNGINXIngress(ing *extensions.Ingress) bool {
-	class, _ := parser.GetStringAnnotation(ingressClassKey, ing)
-	return class == "" || class == nginxIngressClass
+// IsValidClass returns true if the given Ingress either doesn't specify
+// the ingress.class annotation, or it's set to the configured in the
+// ingress controller.
+func IsValidClass(ing *extensions.Ingress, class string) bool {
+	if class == "" {
+		return true
+	}
+
+	cc, _ := parser.GetStringAnnotation(ingressClassKey, ing)
+	return cc == class
 }

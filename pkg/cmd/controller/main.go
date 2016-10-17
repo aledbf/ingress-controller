@@ -54,6 +54,9 @@ func main() {
     	namespace/name. The controller uses the first node port of this Service for
     	the default backend.`)
 
+		ingressClass = flags.String("ingress-class", "nginx",
+			`Name of the ingress class to route through this controller.`)
+
 		nxgConfigMap = flags.String("nginx-configmap", "",
 			`Name of the ConfigMap that containes the custom nginx configuration to use`)
 
@@ -99,6 +102,9 @@ func main() {
 	flag.Set("logtostderr", "true")
 
 	glog.Infof("Using build version %v from repo %v commit %v", version.RELEASE, version.REPO, version.COMMIT)
+	if *ingressClass != "" {
+		glog.Infof("Watching for ingress class: %s", *ingressClass)
+	}
 
 	if *defaultSvc == "" {
 		glog.Fatalf("Please specify --default-backend-service")
@@ -154,6 +160,7 @@ func main() {
 		ElectionClient:        leaderElectionClient,
 		ResyncPeriod:          *resyncPeriod,
 		DefaultService:        *defaultSvc,
+		IngressClass:          *ingressClass,
 		Namespace:             *watchNamespace,
 		NginxConfigMapName:    *nxgConfigMap,
 		TCPConfigMapName:      *tcpConfigMapName,
