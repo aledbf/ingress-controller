@@ -33,6 +33,7 @@ This is an nginx Ingress controller that uses [ConfigMap](https://github.com/kub
 * [Local cluster](#local-cluster)
 * [Debug & Troubleshooting](#troubleshooting)
 * [Why endpoints and not services?](#why-endpoints-and-not-services)
+* [Metrics](#metrics)
 * [Limitations](#limitations)
 * [NGINX Notes](#nginx-notes)
 
@@ -454,6 +455,13 @@ I0316 12:24:37.610073       1 command.go:69] change in configuration detected. R
 
 - `--v=3` shows details about the service, Ingress rule, endpoint changes and it dumps the nginx configuration in JSON format
 - `--v=5` configures NGINX in [debug mode](http://nginx.org/en/docs/debugging_log.html)
+
+### Metrics
+
+Using the doc [Instrumenting Kubernetes with a new metric](https://github.com/kubernetes/kubernetes/blob/master/docs/devel/instrumentation.md#instrumenting-kubernetes-with-a-new-metric) the Ingress controller
+exposes the registered metrics via HTTP. Besides the default metrics provided by Prometheus is possible to get the number of reloads `reload_operations` and reloads with error `reload_operations_errors`, 
+ie error in validation in the configuration file before the reload. The metrics are exposed in port `10254` and path `/metrics`. 
+Using curl: `curl -v <pod ip>:10254/metrics`
 
 
 ### Limitations
