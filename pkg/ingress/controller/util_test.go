@@ -19,6 +19,8 @@ package controller
 import (
 	"testing"
 
+	"github.com/aledbf/ingress-controller/pkg/ingress"
+
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 )
@@ -47,5 +49,30 @@ func TestIsValidClass(t *testing.T) {
 	if b {
 		t.Errorf("Expected invalid class but %v returned", b)
 	}
+}
 
+func TestIsDefaultUpstream(t *testing.T) {
+
+	tests := []struct {
+		title    string
+		upstream *ingress.Upstream
+		exp      bool
+	}{
+		{"no upstream", nil, false},
+		{"empty", &ingress.Upstream{}, false},
+		{"empty", &ingress.Upstream{Backends: []ingress.UpstreamServer{}}, false},
+		{"empty", &ingress.Upstream{
+			Backends: []ingress.UpstreamServer{
+				{Address: "127.0.0.1", Port: "8181"},
+			},
+		}, true},
+	}
+
+	for _, test := range tests {
+		idu := isDefaultUpstream(test.upstream)
+		if test.exp != idu {
+			t.Errorf("%v: expected %v but retuned %v", test.title, test.exp, idu)
+			continue
+		}
+	}
 }
