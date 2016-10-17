@@ -1,6 +1,9 @@
-language: go
+sudo: required
 
-sudo: false
+services:
+  - docker
+
+language: go
 
 notifications:
   email: true
@@ -9,6 +12,16 @@ go:
   - 1.7
   - tip
 
+env:
+  global:
+  - ETCD_VERSION=3.0.12
+  - K8S_VERSION=1.4.2
+
+before_install:
+  - sudo bash -c 'sysctl net.ipv6.conf.all.disable_ipv6=0'
+  - sudo bash -c 'sysctl net.ipv6.conf.default.disable_ipv6=0'
+  - sudo bash -c 'sysctl net.ipv6.conf.lo.disable_ipv6=0'
+
 install:
   - go get github.com/golang/lint/golint
   - go get golang.org/x/tools/cmd/cover
@@ -16,5 +29,9 @@ install:
   - go get github.com/modocache/gover
   - if ! go get github.com/golang/tools/cmd/cover; then go get golang.org/x/tools/cmd/cover; fi
 
-script:
+before_script:
+  - ./.travis/kubernetes/setup.sh
+  - ./.travis/kubernetes/kubectl version
+
+script:  
   - make build vet lint fmt test cover
