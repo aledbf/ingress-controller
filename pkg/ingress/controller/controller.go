@@ -884,6 +884,11 @@ func (ic *GenericController) getPemsFromIngress(data []interface{}) map[string]i
 		ing := ingIf.(*extensions.Ingress)
 		for _, tls := range ing.Spec.TLS {
 			secretName := tls.SecretName
+			if secretName == "" {
+				glog.Errorf("No secretName defined for hosts")
+				continue
+			}
+
 			secretKey := fmt.Sprintf("%s/%s", ing.Namespace, secretName)
 
 			ngxCert, err := ic.getPemCertificate(secretKey)
@@ -911,17 +916,17 @@ func (ic *GenericController) getPemCertificate(secretName string) (ingress.SSLCe
 		return ingress.SSLCert{}, fmt.Errorf("Error retriveing secret %v: %v", secretName, err)
 	}
 	if !exists {
-		return ingress.SSLCert{}, fmt.Errorf("Secret %v does not exists", secretName)
+		return ingress.SSLCert{}, fmt.Errorf("secret named %v does not exists", secretName)
 	}
 
 	secret := secretInterface.(*api.Secret)
 	cert, ok := secret.Data[api.TLSCertKey]
 	if !ok {
-		return ingress.SSLCert{}, fmt.Errorf("Secret %v has no private key", secretName)
+		return ingress.SSLCert{}, fmt.Errorf("secret named %v has no private key", secretName)
 	}
 	key, ok := secret.Data[api.TLSPrivateKeyKey]
 	if !ok {
-		return ingress.SSLCert{}, fmt.Errorf("Secret %v has no cert", secretName)
+		return ingress.SSLCert{}, fmt.Errorf("secret named %v has no cert", secretName)
 	}
 
 	ca := secret.Data["ca.crt"]
