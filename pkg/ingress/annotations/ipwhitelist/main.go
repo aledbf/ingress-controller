@@ -50,18 +50,18 @@ func ParseAnnotations(cfg defaults.Upstream, ing *extensions.Ingress) (*SourceRa
 	cidrs := []string{}
 
 	if ing.GetAnnotations() == nil {
-		return &SourceRange{cidrs}, parser.ErrMissingAnnotations
+		return &SourceRange{CIDR: cfg.WhitelistSourceRange}, parser.ErrMissingAnnotations
 	}
 
 	val, err := parser.GetStringAnnotation(whitelist, ing)
 	if err != nil {
-		return &SourceRange{cfg.WhitelistSourceRange}, err
+		return &SourceRange{CIDR: cfg.WhitelistSourceRange}, err
 	}
 
 	values := strings.Split(val, ",")
 	ipnets, err := sets.ParseIPNets(values...)
 	if err != nil {
-		return &SourceRange{cfg.WhitelistSourceRange}, ErrInvalidCIDR
+		return &SourceRange{CIDR: cfg.WhitelistSourceRange}, ErrInvalidCIDR
 	}
 
 	for k := range ipnets {
