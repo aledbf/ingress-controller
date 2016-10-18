@@ -19,6 +19,7 @@ package ingress
 import (
 	"os/exec"
 
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/healthz"
 
 	"github.com/aledbf/ingress-controller/pkg/ingress/annotations/auth"
@@ -32,9 +33,7 @@ import (
 
 // IController ...
 type IController interface {
-	Name() string
-
-	HealthzPort() int
+	healthz.HealthzChecker
 
 	Start() *exec.Cmd
 	Stop() *exec.Cmd
@@ -42,9 +41,7 @@ type IController interface {
 
 	Test(file string) *exec.Cmd
 
-	HealthzChecker() healthz.HealthzChecker
-
-	OnUpdate(Configuration) error
+	OnUpdate(*api.ConfigMap, Configuration) error
 }
 
 // Configuration describes

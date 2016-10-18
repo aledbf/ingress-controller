@@ -12,6 +12,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/spf13/pflag"
 
+	"github.com/aledbf/ingress-controller/pkg/ingress"
 	"github.com/aledbf/ingress-controller/pkg/k8s"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -23,7 +24,7 @@ import (
 )
 
 // NewIngressController returns a configured Ingress controller ready to start
-func NewIngressController() IngressController {
+func NewIngressController(backend ingress.IController) IngressController {
 	var (
 		flags = pflag.NewFlagSet("", pflag.ExitOnError)
 
@@ -146,6 +147,7 @@ func NewIngressController() IngressController {
 		DefaultSSLCertificate: *defSSLCertificate,
 		DefaultHealthzURL:     *defHealthzURL,
 		PublishService:        *publishSvc,
+		Backend:               backend,
 	}
 
 	ic := newIngressController(config)

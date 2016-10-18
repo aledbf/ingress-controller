@@ -129,6 +129,8 @@ type Configuration struct {
 	PublishService        string
 
 	UpstreamDefaults defaults.Upstream
+
+	Backend ingress.IController
 }
 
 // newIngressController creates a controller for nginx loadbalancer
@@ -332,25 +334,25 @@ func (ic *GenericController) sync(key interface{}) error {
 	}
 
 	// by default no custom configuration configmap
-	//cfg := &api.ConfigMap{}
+	cfg := &api.ConfigMap{}
 
-	/*	if ic.cfg.ConfigMapName != "" {
-			// Search for custom configmap (defined in main args)
-			var err error
-			ns, name, _ := k8s.ParseNameNS(ic.cfg.ConfigMapName)
-			cfg, err = ic.getConfigMap(ns, name)
-			if err != nil {
-				return fmt.Errorf("unexpected error searching configmap %v: %v", ic.cfg.ConfigMapName, err)
-			}
+	if ic.cfg.ConfigMapName != "" {
+		// Search for custom configmap (defined in main args)
+		var err error
+		ns, name, _ := k8s.ParseNameNS(ic.cfg.ConfigMapName)
+		cfg, err = ic.getConfigMap(ns, name)
+		if err != nil {
+			return fmt.Errorf("unexpected error searching configmap %v: %v", ic.cfg.ConfigMapName, err)
 		}
-	*/
+	}
+
 	//ngxConfig := ic.backend.ReadConfig(cfg)
 	//ngxConfig.HealthzURL = ic.cfg.DefaultHealthzURL
 
 	ings := ic.ingLister.Store.List()
 	upstreams, servers := ic.getUpstreamServers(ings)
 
-	err := ic.backend.OnUpdate(ingress.Configuration{
+	err := ic.backend.OnUpdate(cfg, ingress.Configuration{
 		Upstreams:    upstreams,
 		Servers:      servers,
 		TCPUpstreams: ic.getTCPServices(),
