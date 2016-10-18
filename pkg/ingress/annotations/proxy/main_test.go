@@ -23,7 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/util/intstr"
 
-	"github.com/aledbf/ingress-controller/nginx/config"
+	"github.com/aledbf/ingress-controller/pkg/ingress/defaults"
 )
 
 func buildIngress() *extensions.Ingress {
@@ -71,8 +71,7 @@ func TestIngressHealthCheck(t *testing.T) {
 	data[bufferSize] = "1k"
 	ing.SetAnnotations(data)
 
-	cfg := config.Configuration{}
-	cfg.UpstreamFailTimeout = 1
+	cfg := defaults.Upstream{FailTimeout: 1}
 
 	p := ParseAnnotations(cfg, ing)
 

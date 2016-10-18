@@ -18,7 +18,8 @@ package ingress
 
 import (
 	"os/exec"
-	"text/template"
+
+	"k8s.io/kubernetes/pkg/healthz"
 
 	"github.com/aledbf/ingress-controller/pkg/ingress/annotations/auth"
 	"github.com/aledbf/ingress-controller/pkg/ingress/annotations/authreq"
@@ -35,16 +36,18 @@ type IController interface {
 
 	HealthzPort() int
 
-	Start() *exec.Cmd
-	Stop() *exec.Cmd
-	Restart() *exec.Cmd
+	Start() exec.Cmd
+	Stop() exec.Cmd
+	Restart() exec.Cmd
 
-	Check() *exec.Cmd
+	Check(file string) exec.Cmd
 
-	Template() *template.Template
+	HealthzChecker() healthz.HealthzChecker
+
+	OnUpdate(Configuration) error
 }
 
-// Configuration describes a configuration
+// Configuration describes
 type Configuration struct {
 	Upstreams    []*Upstream
 	Servers      []*Server
@@ -52,11 +55,15 @@ type Configuration struct {
 	UDPUpstreams []*Location
 }
 
-// Upstream describes an upstream
+// Upstream describes an upstream server (endpoint)
 type Upstream struct {
-	Name     string
+	// Name represents an unique api.Service name formatted
+	// as <namespace>-<name>-<port>
+	Name string
+	// Backends
 	Backends []UpstreamServer
-	Secure   bool
+	// Secure indicates if the communication with the en
+	Secure bool
 }
 
 // UpstreamByNameServers sorts upstreams by name
@@ -70,8 +77,12 @@ func (c UpstreamByNameServers) Less(i, j int) bool {
 
 // UpstreamServer describes a server in an upstream
 type UpstreamServer struct {
-	Address     string
-	Port        string
+	// Address IP address of the endpoint
+	Address string
+	Port    string
+	// MaxFails returns the maximum number of check failures
+	// allowed before this should be considered dow.
+	// Setting 0 indicates that the check is performed by a Kubernetes probe
 	MaxFails    int
 	FailTimeout int
 }

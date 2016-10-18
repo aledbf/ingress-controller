@@ -1,6 +1,23 @@
+package controller
 
-func NewLoadBalancer() (IngressController, error){
-    healthPort := 10254
+import (
+	"flag"
+	"os"
+	"time"
+
+	"github.com/golang/glog"
+	"github.com/spf13/pflag"
+
+	"github.com/aledbf/ingress-controller/pkg/k8s"
+
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/client/restclient"
+	"k8s.io/kubernetes/pkg/client/unversioned"
+)
+
+// NewIngressController returns a configured Ingress controller ready to start
+func NewIngressController() (IngressController, error) {
+	healthPort := 10254
 
 	var (
 		flags = pflag.NewFlagSet("", pflag.ExitOnError)
@@ -57,7 +74,7 @@ func NewLoadBalancer() (IngressController, error){
 
 	flag.Set("logtostderr", "true")
 
-	glog.Infof("Using build version %v from repo %v commit %v", version.RELEASE, version.REPO, version.COMMIT)
+	//glog.Infof("Using build version %v from repo %v commit %v", version.RELEASE, version.REPO, version.COMMIT)
 	if *ingressClass != "" {
 		glog.Infof("Watching for ingress class: %s", *ingressClass)
 	}
@@ -111,7 +128,7 @@ func NewLoadBalancer() (IngressController, error){
 		}
 	}
 
-	config := &controller.Configuration{
+	config := &Configuration{
 		Client:                kubeClient,
 		ElectionClient:        leaderElectionClient,
 		ResyncPeriod:          *resyncPeriod,
@@ -126,5 +143,5 @@ func NewLoadBalancer() (IngressController, error){
 		PublishService:        *publishSvc,
 	}
 
-    return NewLoadBalancer(config)
+	return NewIngressController(config)
 }

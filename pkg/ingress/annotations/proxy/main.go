@@ -19,8 +19,8 @@ package proxy
 import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 
-	"github.com/aledbf/ingress-controller/nginx/config"
 	"github.com/aledbf/ingress-controller/pkg/ingress/annotations/parser"
+	"github.com/aledbf/ingress-controller/pkg/ingress/defaults"
 )
 
 const (
@@ -40,34 +40,34 @@ type Configuration struct {
 
 // ParseAnnotations parses the annotations contained in the ingress
 // rule used to configure upstream check parameters
-func ParseAnnotations(cfg config.Configuration, ing *extensions.Ingress) *Configuration {
+func ParseAnnotations(cfg defaults.Upstream, ing *extensions.Ingress) *Configuration {
 	if ing == nil || ing.GetAnnotations() == nil {
 		return &Configuration{
-			cfg.ProxyConnectTimeout,
-			cfg.ProxySendTimeout,
-			cfg.ProxyReadTimeout,
-			cfg.ProxyBufferSize,
+			cfg.ConnectTimeout,
+			cfg.SendTimeout,
+			cfg.ReadTimeout,
+			cfg.BufferSize,
 		}
 	}
 
 	ct, err := parser.GetIntAnnotation(connect, ing)
 	if err != nil {
-		ct = cfg.ProxyConnectTimeout
+		ct = cfg.ConnectTimeout
 	}
 
 	st, err := parser.GetIntAnnotation(send, ing)
 	if err != nil {
-		st = cfg.ProxySendTimeout
+		st = cfg.SendTimeout
 	}
 
 	rt, err := parser.GetIntAnnotation(read, ing)
 	if err != nil {
-		rt = cfg.ProxyReadTimeout
+		rt = cfg.ReadTimeout
 	}
 
 	bs, err := parser.GetStringAnnotation(bufferSize, ing)
 	if err != nil || bs == "" {
-		bs = cfg.ProxyBufferSize
+		bs = cfg.BufferSize
 	}
 
 	return &Configuration{ct, st, rt, bs}
