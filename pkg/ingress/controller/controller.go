@@ -130,7 +130,7 @@ type Configuration struct {
 
 	UpstreamDefaults defaults.Upstream
 
-	Backend ingress.IController
+	Backend ingress.IngressController
 }
 
 // newIngressController creates an Ingress controller
