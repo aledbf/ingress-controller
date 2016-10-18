@@ -21,8 +21,22 @@ import (
 
 	"github.com/aledbf/ingress-controller/pkg/ingress"
 	"github.com/aledbf/ingress-controller/pkg/ingress/annotations/parser"
+
 	"k8s.io/kubernetes/pkg/apis/extensions"
 )
+
+// newDefaultServer return an UpstreamServer to be use as default server that returns 503.
+func newDefaultServer() ingress.UpstreamServer {
+	return ingress.UpstreamServer{Address: "127.0.0.1", Port: "8181"}
+}
+
+// newUpstream creates an upstream without servers.
+func newUpstream(name string) *ingress.Upstream {
+	return &ingress.Upstream{
+		Name:     name,
+		Backends: []ingress.UpstreamServer{},
+	}
+}
 
 func isHostValid(host string, cns []string) bool {
 	for _, cn := range cns {

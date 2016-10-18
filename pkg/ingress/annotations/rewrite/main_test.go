@@ -23,7 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/util/intstr"
 
-	"github.com/aledbf/ingress-controller/nginx/config"
+	"github.com/aledbf/ingress-controller/pkg/ingress/defaults"
 )
 
 const (
@@ -67,7 +67,7 @@ func buildIngress() *extensions.Ingress {
 
 func TestWithoutAnnotations(t *testing.T) {
 	ing := buildIngress()
-	_, err := ParseAnnotations(config.NewDefault(), ing)
+	_, err := ParseAnnotations(defaults.Upstream{}, ing)
 	if err == nil {
 		t.Error("Expected error with ingress without annotations")
 	}
@@ -80,7 +80,7 @@ func TestRedirect(t *testing.T) {
 	data[rewriteTo] = defRoute
 	ing.SetAnnotations(data)
 
-	redirect, err := ParseAnnotations(config.NewDefault(), ing)
+	redirect, err := ParseAnnotations(defaults.Upstream{}, ing)
 	if err != nil {
 		t.Errorf("Uxpected error with ingress: %v", err)
 	}
@@ -93,7 +93,7 @@ func TestRedirect(t *testing.T) {
 func TestSSLRedirect(t *testing.T) {
 	ing := buildIngress()
 
-	cfg := config.Configuration{SSLRedirect: true}
+	cfg := defaults.Upstream{Secure: true}
 
 	data := map[string]string{}
 

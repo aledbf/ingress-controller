@@ -19,8 +19,8 @@ package rewrite
 import (
 	"errors"
 
-	"github.com/aledbf/ingress-controller/nginx/config"
 	"github.com/aledbf/ingress-controller/pkg/ingress/annotations/parser"
+	"github.com/aledbf/ingress-controller/pkg/ingress/defaults"
 
 	"k8s.io/kubernetes/pkg/apis/extensions"
 )
@@ -38,20 +38,20 @@ type Redirect struct {
 	// AddBaseURL indicates if is required to add a base tag in the head
 	// of the responses from the upstream servers
 	AddBaseURL bool
-	// Should indicates if the location section should be accessible SSL only
+	// SSLRedirect indicates if the location section is accessible SSL only
 	SSLRedirect bool
 }
 
 // ParseAnnotations parses the annotations contained in the ingress
 // rule used to rewrite the defined paths
-func ParseAnnotations(cfg config.Configuration, ing *extensions.Ingress) (*Redirect, error) {
+func ParseAnnotations(cfg defaults.Upstream, ing *extensions.Ingress) (*Redirect, error) {
 	if ing.GetAnnotations() == nil {
 		return &Redirect{}, errors.New("no annotations present")
 	}
 
 	sslRe, err := parser.GetBoolAnnotation(sslRedirect, ing)
 	if err != nil {
-		sslRe = cfg.SSLRedirect
+		sslRe = cfg.Secure
 	}
 
 	rt, _ := parser.GetStringAnnotation(rewriteTo, ing)

@@ -1,20 +1,4 @@
-/*
-Copyright 2015 The Kubernetes Authors.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
-
-package main
+package controller
 
 import (
 	"flag"
@@ -22,18 +6,14 @@ import (
 	"net/http"
 	"net/http/pprof"
 	"os"
-	"os/signal"
-	"syscall"
 	"time"
 
 	"github.com/golang/glog"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/spf13/pflag"
 
-	"github.com/aledbf/ingress-controller/pkg/ingress/controller"
 	"github.com/aledbf/ingress-controller/pkg/k8s"
-	"github.com/aledbf/ingress-controller/pkg/version"
 
-	"github.com/prometheus/client_golang/prometheus"
 	"k8s.io/kubernetes/pkg/api"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/restclient"
@@ -42,11 +22,8 @@ import (
 	kubectl_util "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
 
-func main() {
-	const (
-		healthPort = 10254
-	)
-
+// NewIngressController returns a configured Ingress controller ready to start
+func NewIngressController() IngressController {
 	var (
 		flags = pflag.NewFlagSet("", pflag.ExitOnError)
 
@@ -85,7 +62,7 @@ func main() {
 		watchNamespace = flags.String("watch-namespace", api.NamespaceAll,
 			`Namespace to watch for Ingress. Default is to watch all namespaces`)
 
-		healthzPort = flags.Int("healthz-port", healthPort, "port for healthz endpoint.")
+		healthzPort = flags.Int("healthz-port", 10254, "port for healthz endpoint.")
 
 		profiling = flags.Bool("profiling", true, `Enable profiling via web interface host:port/debug/pprof/`)
 
@@ -102,7 +79,7 @@ func main() {
 
 	flag.Set("logtostderr", "true")
 
-	glog.Infof("Using build version %v from repo %v commit %v", version.RELEASE, version.REPO, version.COMMIT)
+	//glog.Infof("Using build version %v from repo %v commit %v", version.RELEASE, version.REPO, version.COMMIT)
 	if *ingressClass != "" {
 		glog.Infof("Watching for ingress class: %s", *ingressClass)
 	}
@@ -156,14 +133,14 @@ func main() {
 		}
 	}
 
-	config := &controller.Configuration{
+	config := &Configuration{
 		Client:                kubeClient,
 		ElectionClient:        leaderElectionClient,
 		ResyncPeriod:          *resyncPeriod,
 		DefaultService:        *defaultSvc,
 		IngressClass:          *ingressClass,
 		Namespace:             *watchNamespace,
-		NginxConfigMapName:    *nxgConfigMap,
+		ConfigMapName:         *nxgConfigMap,
 		TCPConfigMapName:      *tcpConfigMapName,
 		UDPConfigMapName:      *udpConfigMapName,
 		DefaultSSLCertificate: *defSSLCertificate,
@@ -171,30 +148,12 @@ func main() {
 		PublishService:        *publishSvc,
 	}
 
-	ic, err := controller.NewLoadBalancer(config)
-	if err != nil {
-		glog.Fatalf("%v", err)
-	}
-
+	ic := newIngressController(config)
 	go registerHandlers(*profiling, *healthzPort, ic)
-
-	ic.Start()
-
-	signalChan := make(chan os.Signal, 1)
-	signal.Notify(signalChan, syscall.SIGTERM)
-	<-signalChan
-	glog.Infof("The process received the a signal (SIGTERM), shutting down...")
-	exitCode := 0
-	if err := ic.Stop(); err != nil {
-		glog.Infof("Error during shutdown %v", err)
-		exitCode = 1
-	}
-
-	glog.Infof("Exiting with %v", exitCode)
-	os.Exit(exitCode)
+	return ic
 }
 
-func registerHandlers(enableProfiling bool, port int, ic controller.IngressController) {
+func registerHandlers(enableProfiling bool, port int, ic IngressController) {
 	mux := http.NewServeMux()
 	healthz.InstallHandler(mux, ic.Check())
 
@@ -202,7 +161,7 @@ func registerHandlers(enableProfiling bool, port int, ic controller.IngressContr
 
 	mux.HandleFunc("/build", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprintf(w, "build version %v from repo %v commit %v", version.RELEASE, version.REPO, version.COMMIT)
+		//fmt.Fprintf(w, "build version %v from repo %v commit %v", version.RELEASE, version.REPO, version.COMMIT)
 	})
 
 	mux.HandleFunc("/stop", func(w http.ResponseWriter, r *http.Request) {

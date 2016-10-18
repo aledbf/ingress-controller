@@ -33,4 +33,4 @@ before_script:
   - ./.travis/kubernetes/kubectl version
 
 script:  
-  - make build vet lint fmt test cover
+  - make fmt lint vet cover

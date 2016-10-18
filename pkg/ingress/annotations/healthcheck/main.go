@@ -19,8 +19,8 @@ package healthcheck
 import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 
-	"github.com/aledbf/ingress-controller/nginx/config"
 	"github.com/aledbf/ingress-controller/pkg/ingress/annotations/parser"
+	"github.com/aledbf/ingress-controller/pkg/ingress/defaults"
 )
 
 const (
@@ -37,19 +37,19 @@ type Upstream struct {
 
 // ParseAnnotations parses the annotations contained in the ingress
 // rule used to configure upstream check parameters
-func ParseAnnotations(cfg config.Configuration, ing *extensions.Ingress) *Upstream {
+func ParseAnnotations(cfg defaults.Upstream, ing *extensions.Ingress) *Upstream {
 	if ing.GetAnnotations() == nil {
-		return &Upstream{cfg.UpstreamMaxFails, cfg.UpstreamFailTimeout}
+		return &Upstream{cfg.MaxFails, cfg.FailTimeout}
 	}
 
 	mf, err := parser.GetIntAnnotation(upsMaxFails, ing)
 	if err != nil {
-		mf = cfg.UpstreamMaxFails
+		mf = cfg.MaxFails
 	}
 
 	ft, err := parser.GetIntAnnotation(upsFailTimeout, ing)
 	if err != nil {
-		ft = cfg.UpstreamFailTimeout
+		ft = cfg.FailTimeout
 	}
 
 	return &Upstream{mf, ft}

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package template
+package watch
 
 import (
 	"log"
@@ -23,15 +23,15 @@ import (
 	"gopkg.in/fsnotify.v1"
 )
 
-type fileWatcher struct {
+type FileWatcher struct {
 	file    string
 	watcher *fsnotify.Watcher
 	// onEvent callback to be invoked after the file being watched changes
 	onEvent func()
 }
 
-func newFileWatcher(file string, onEvent func()) (fileWatcher, error) {
-	fw := fileWatcher{
+func NewFileWatcher(file string, onEvent func()) (FileWatcher, error) {
+	fw := FileWatcher{
 		file:    file,
 		onEvent: onEvent,
 	}
@@ -40,12 +40,12 @@ func newFileWatcher(file string, onEvent func()) (fileWatcher, error) {
 	return fw, err
 }
 
-func (f fileWatcher) close() error {
+func (f FileWatcher) close() error {
 	return f.watcher.Close()
 }
 
 // watch creates a fsnotify watcher for a file and create of write events
-func (f *fileWatcher) watch() error {
+func (f *FileWatcher) watch() error {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		return err

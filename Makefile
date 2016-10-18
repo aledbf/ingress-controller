@@ -15,17 +15,6 @@ endif
 
 PKG := "github.com/aledbf/ingress-controller"
 
-build: clean
-	CGO_ENABLED=0 GOOS=${GOOS} go build -a -installsuffix cgo \
-		-ldflags "-s -w -X ${PKG}/pkg/version.RELEASE=${RELEASE} -X ${PKG}/pkg/version.COMMIT=${COMMIT} -X ${PKG}/pkg/version.REPO=${REPO_INFO}" \
-		-o nginx-ingress-controller ${PKG}/pkg/cmd/controller 
-
-container: build
-	docker build -t $(PREFIX):$(RELEASE) .
-
-push: container
-	gcloud docker push $(PREFIX):$(RELEASE)
-
 fmt:
 	@echo "+ $@"
 	@go list -f '{{if len .TestGoFiles}}"gofmt -s -l {{.Dir}}"{{end}}' $(shell go list ${PKG}/... | grep -v vendor) | xargs -L 1 sh -c

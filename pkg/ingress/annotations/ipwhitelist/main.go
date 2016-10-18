@@ -21,6 +21,7 @@ import (
 	"strings"
 
 	"github.com/aledbf/ingress-controller/pkg/ingress/annotations/parser"
+	"github.com/aledbf/ingress-controller/pkg/ingress/defaults"
 
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/util/net/sets"
@@ -45,22 +46,22 @@ type SourceRange struct {
 // rule used to limit access to certain client addresses or networks.
 // Multiple ranges can specified using commas as separator
 // e.g. `18.0.0.0/8,56.0.0.0/8`
-func ParseAnnotations(whiteList []string, ing *extensions.Ingress) (*SourceRange, error) {
+func ParseAnnotations(cfg defaults.Upstream, ing *extensions.Ingress) (*SourceRange, error) {
 	cidrs := []string{}
 
 	if ing.GetAnnotations() == nil {
-		return &SourceRange{cidrs}, parser.ErrMissingAnnotations
+		return &SourceRange{CIDR: cfg.WhitelistSourceRange}, parser.ErrMissingAnnotations
 	}
 
 	val, err := parser.GetStringAnnotation(whitelist, ing)
 	if err != nil {
-		return &SourceRange{cidrs}, err
+		return &SourceRange{CIDR: cfg.WhitelistSourceRange}, err
 	}
 
 	values := strings.Split(val, ",")
 	ipnets, err := sets.ParseIPNets(values...)
 	if err != nil {
-		return &SourceRange{cidrs}, ErrInvalidCIDR
+		return &SourceRange{CIDR: cfg.WhitelistSourceRange}, ErrInvalidCIDR
 	}
 
 	for k := range ipnets {
