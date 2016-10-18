@@ -1,51 +1,6 @@
-/*
-Copyright 2015 The Kubernetes Authors.
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
-
-package main
-
-import (
-	"flag"
-	"fmt"
-	"net/http"
-	"net/http/pprof"
-	"os"
-	"os/signal"
-	"syscall"
-	"time"
-
-	"github.com/golang/glog"
-	"github.com/spf13/pflag"
-
-	"github.com/aledbf/ingress-controller/pkg/ingress/controller"
-	"github.com/aledbf/ingress-controller/pkg/k8s"
-	"github.com/aledbf/ingress-controller/pkg/version"
-
-	"github.com/prometheus/client_golang/prometheus"
-	"k8s.io/kubernetes/pkg/api"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	"k8s.io/kubernetes/pkg/client/restclient"
-	"k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/healthz"
-	kubectl_util "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-)
-
-func main() {
-	const (
-		healthPort = 10254
-	)
+func NewLoadBalancer() (IngressController, error){
+    healthPort := 10254
 
 	var (
 		flags = pflag.NewFlagSet("", pflag.ExitOnError)
@@ -171,53 +126,5 @@ func main() {
 		PublishService:        *publishSvc,
 	}
 
-	ic, err := controller.NewLoadBalancer(config)
-	if err != nil {
-		glog.Fatalf("%v", err)
-	}
-
-	go registerHandlers(*profiling, *healthzPort, ic)
-
-	ic.Start()
-
-	signalChan := make(chan os.Signal, 1)
-	signal.Notify(signalChan, syscall.SIGTERM)
-	<-signalChan
-	glog.Infof("The process received the a signal (SIGTERM), shutting down...")
-	exitCode := 0
-	if err := ic.Stop(); err != nil {
-		glog.Infof("Error during shutdown %v", err)
-		exitCode = 1
-	}
-
-	glog.Infof("Exiting with %v", exitCode)
-	os.Exit(exitCode)
-}
-
-func registerHandlers(enableProfiling bool, port int, ic controller.IngressController) {
-	mux := http.NewServeMux()
-	healthz.InstallHandler(mux, ic.Check())
-
-	mux.Handle("/metrics", prometheus.Handler())
-
-	mux.HandleFunc("/build", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		fmt.Fprintf(w, "build version %v from repo %v commit %v", version.RELEASE, version.REPO, version.COMMIT)
-	})
-
-	mux.HandleFunc("/stop", func(w http.ResponseWriter, r *http.Request) {
-		ic.Stop()
-	})
-
-	if enableProfiling {
-		mux.HandleFunc("/debug/pprof/", pprof.Index)
-		mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
-		mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
-	}
-
-	server := &http.Server{
-		Addr:    fmt.Sprintf(":%v", port),
-		Handler: mux,
-	}
-	glog.Fatal(server.ListenAndServe())
+    return NewLoadBalancer(config)
 }

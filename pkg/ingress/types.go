@@ -17,6 +17,9 @@ limitations under the License.
 package ingress
 
 import (
+	"os/exec"
+	"text/template"
+
 	"github.com/aledbf/ingress-controller/pkg/ingress/annotations/auth"
 	"github.com/aledbf/ingress-controller/pkg/ingress/annotations/authreq"
 	"github.com/aledbf/ingress-controller/pkg/ingress/annotations/authtls"
@@ -25,6 +28,21 @@ import (
 	"github.com/aledbf/ingress-controller/pkg/ingress/annotations/ratelimit"
 	"github.com/aledbf/ingress-controller/pkg/ingress/annotations/rewrite"
 )
+
+// IController ...
+type IController interface {
+	Name() string
+
+	HealthzPort() int
+
+	Start() *exec.Cmd
+	Stop() *exec.Cmd
+	Restart() *exec.Cmd
+
+	Check() *exec.Cmd
+
+	Template() *template.Template
+}
 
 // Configuration describes a configuration
 type Configuration struct {

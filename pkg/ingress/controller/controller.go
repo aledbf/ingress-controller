@@ -129,8 +129,8 @@ type Configuration struct {
 	PublishService        string
 }
 
-// NewLoadBalancer creates a controller for nginx loadbalancer
-func NewLoadBalancer(config *Configuration) (IngressController, error) {
+// newLoadBalancer creates a controller for nginx loadbalancer
+func newLoadBalancer(config *Configuration) (IngressController, error) {
 
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
@@ -1055,4 +1055,6 @@ func (ic GenericController) Start() {
 	go ic.syncQueue.Run(time.Second, ic.stopCh)
 
 	go ic.syncStatus.Run(ic.stopCh)
+
+	<-ic.stopCh
 }
