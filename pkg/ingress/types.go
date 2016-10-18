@@ -36,7 +36,7 @@ type IController interface {
 	healthz.HealthzChecker
 
 	Start() *exec.Cmd
-	Stop() *exec.Cmd
+	Stop() error
 	Restart() *exec.Cmd
 
 	Test(file string) *exec.Cmd
