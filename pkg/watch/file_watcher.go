@@ -40,7 +40,7 @@ func NewFileWatcher(file string, onEvent func()) (FileWatcher, error) {
 	return fw, err
 }
 
-func (f FileWatcher) close() error {
+func (f FileWatcher) Close() error {
 	return f.watcher.Close()
 }
 
