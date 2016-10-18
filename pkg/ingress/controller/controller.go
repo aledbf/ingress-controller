@@ -133,7 +133,7 @@ type Configuration struct {
 	Backend ingress.IController
 }
 
-// newIngressController creates a controller for nginx loadbalancer
+// newIngressController creates an Ingress controller
 func newIngressController(config *Configuration) IngressController {
 
 	eventBroadcaster := record.NewBroadcaster()
@@ -156,7 +156,7 @@ func newIngressController(config *Configuration) IngressController {
 				glog.Infof("Ignoring add for ingress %v based on annotation %v", addIng.Name, ingressClassKey)
 				return
 			}
-			ic.recorder.Eventf(addIng, api.EventTypeNormal, "CREATE", fmt.Sprintf("%s/%s", addIng.Namespace, addIng.Name))
+			ic.recorder.Eventf(addIng, api.EventTypeNormal, "CREATE", fmt.Sprintf("Ingress %s/%s", addIng.Namespace, addIng.Name))
 			ic.syncQueue.Enqueue(obj)
 		},
 		DeleteFunc: func(obj interface{}) {
@@ -165,7 +165,7 @@ func newIngressController(config *Configuration) IngressController {
 				glog.Infof("Ignoring add for ingress %v based on annotation %v", delIng.Name, ingressClassKey)
 				return
 			}
-			ic.recorder.Eventf(delIng, api.EventTypeNormal, "DELETE", fmt.Sprintf("%s/%s", delIng.Namespace, delIng.Name))
+			ic.recorder.Eventf(delIng, api.EventTypeNormal, "DELETE", fmt.Sprintf("Ingress %s/%s", delIng.Namespace, delIng.Name))
 			ic.syncQueue.Enqueue(obj)
 		},
 		UpdateFunc: func(old, cur interface{}) {
@@ -176,7 +176,7 @@ func newIngressController(config *Configuration) IngressController {
 
 			if !reflect.DeepEqual(old, cur) {
 				upIng := cur.(*extensions.Ingress)
-				ic.recorder.Eventf(upIng, api.EventTypeNormal, "UPDATE", fmt.Sprintf("%s/%s", upIng.Namespace, upIng.Name))
+				ic.recorder.Eventf(upIng, api.EventTypeNormal, "UPDATE", fmt.Sprintf("Ingress %s/%s", upIng.Namespace, upIng.Name))
 				ic.syncQueue.Enqueue(cur)
 			}
 		},
@@ -186,14 +186,14 @@ func newIngressController(config *Configuration) IngressController {
 		AddFunc: func(obj interface{}) {
 			addSecr := obj.(*api.Secret)
 			if ic.secrReferenced(addSecr.Namespace, addSecr.Name) {
-				ic.recorder.Eventf(addSecr, api.EventTypeNormal, "CREATE", fmt.Sprintf("%s/%s", addSecr.Namespace, addSecr.Name))
+				ic.recorder.Eventf(addSecr, api.EventTypeNormal, "CREATE", fmt.Sprintf("Secret %s/%s", addSecr.Namespace, addSecr.Name))
 				ic.syncQueue.Enqueue(obj)
 			}
 		},
 		DeleteFunc: func(obj interface{}) {
 			delSecr := obj.(*api.Secret)
 			if ic.secrReferenced(delSecr.Namespace, delSecr.Name) {
-				ic.recorder.Eventf(delSecr, api.EventTypeNormal, "DELETE", fmt.Sprintf("%s/%s", delSecr.Namespace, delSecr.Name))
+				ic.recorder.Eventf(delSecr, api.EventTypeNormal, "DELETE", fmt.Sprintf("Secret %s/%s", delSecr.Namespace, delSecr.Name))
 				ic.syncQueue.Enqueue(obj)
 			}
 		},
@@ -201,7 +201,7 @@ func newIngressController(config *Configuration) IngressController {
 			if !reflect.DeepEqual(old, cur) {
 				upSecr := cur.(*api.Secret)
 				if ic.secrReferenced(upSecr.Namespace, upSecr.Name) {
-					ic.recorder.Eventf(upSecr, api.EventTypeNormal, "UPDATE", fmt.Sprintf("%s/%s", upSecr.Namespace, upSecr.Name))
+					ic.recorder.Eventf(upSecr, api.EventTypeNormal, "UPDATE", fmt.Sprintf("Secret %s/%s", upSecr.Namespace, upSecr.Name))
 					ic.syncQueue.Enqueue(cur)
 				}
 			}
@@ -229,7 +229,7 @@ func newIngressController(config *Configuration) IngressController {
 				mapKey := fmt.Sprintf("%s/%s", upCmap.Namespace, upCmap.Name)
 				// updates to configuration configmaps can trigger an update
 				if mapKey == ic.cfg.ConfigMapName || mapKey == ic.cfg.TCPConfigMapName || mapKey == ic.cfg.UDPConfigMapName {
-					ic.recorder.Eventf(upCmap, api.EventTypeNormal, "UPDATE", mapKey)
+					ic.recorder.Eventf(upCmap, api.EventTypeNormal, "UPDATE", fmt.Sprintf("ConfigMap %v", mapKey))
 					ic.syncQueue.Enqueue(cur)
 				}
 			}
@@ -413,7 +413,7 @@ func (ic *GenericController) getUDPServices() []*ingress.Location {
 
 func (ic *GenericController) getStreamServices(data map[string]string, proto api.Protocol) []*ingress.Location {
 	var svcs []*ingress.Location
-	// k -> port to expose in nginx
+	// k -> port to expose
 	// v -> <namespace>/<service name>:<port from service to be used>
 	for k, v := range data {
 		port, err := strconv.Atoi(k)
@@ -422,9 +422,9 @@ func (ic *GenericController) getStreamServices(data map[string]string, proto api
 			continue
 		}
 
-		// this ports are required for NGINX
+		// this ports used by the backend
 		if k == "80" || k == "443" || k == "8181" || k == "18080" {
-			glog.Warningf("port %v cannot be used for TCP or UDP services. It is reserved for NGINX", k)
+			glog.Warningf("port %v cannot be used for TCP or UDP services. It is reserved for the Ingress controller", k)
 			continue
 		}
 
@@ -494,7 +494,7 @@ func (ic *GenericController) getStreamServices(data map[string]string, proto api
 	return svcs
 }
 
-// getDefaultUpstream returns an NGINX upstream associated with the
+// getDefaultUpstream returns an upstream associated with the
 // default backend service. In case of error retrieving information
 // configure the upstream to return http code 503.
 func (ic *GenericController) getDefaultUpstream() *ingress.Upstream {
@@ -538,13 +538,13 @@ func (ic *GenericController) getUpstreamServers(data []interface{}) ([]*ingress.
 		ing := ingIf.(*extensions.Ingress)
 
 		nginxAuth, err := auth.ParseAnnotations(ic.cfg.Client, ing, auth.DefAuthDirectory)
-		glog.V(5).Infof("nginx auth %v", nginxAuth)
+		glog.V(5).Infof("auth annotation: %v", nginxAuth)
 		if err != nil {
 			glog.V(5).Infof("error reading authentication in Ingress %v/%v: %v", ing.GetNamespace(), ing.GetName(), err)
 		}
 
 		rl, err := ratelimit.ParseAnnotations(ing)
-		glog.V(5).Infof("nginx rate limit %v", rl)
+		glog.V(5).Infof("rate limit annotation: %v", rl)
 		if err != nil {
 			glog.V(5).Infof("error reading rate limit annotation in Ingress %v/%v: %v", ing.GetNamespace(), ing.GetName(), err)
 		}
@@ -560,7 +560,7 @@ func (ic *GenericController) getUpstreamServers(data []interface{}) ([]*ingress.
 		}
 
 		wl, err := ipwhitelist.ParseAnnotations(ic.cfg.UpstreamDefaults, ing)
-		glog.V(5).Infof("nginx white list %v", wl)
+		glog.V(5).Infof("white list annotation: %v", wl)
 		if err != nil {
 			glog.V(5).Infof("error reading white list annotation in Ingress %v/%v: %v", ing.GetNamespace(), ing.GetName(), err)
 		}
@@ -571,16 +571,16 @@ func (ic *GenericController) getUpstreamServers(data []interface{}) ([]*ingress.
 		}
 
 		ra, err := authreq.ParseAnnotations(ing)
-		glog.V(3).Infof("nginx auth request %v", ra)
+		glog.V(3).Infof("auth request annotation: %v", ra)
 		if err != nil {
 			glog.V(5).Infof("error reading auth request annotation in Ingress %v/%v: %v", ing.GetNamespace(), ing.GetName(), err)
 		}
 
 		prx := proxy.ParseAnnotations(ic.cfg.UpstreamDefaults, ing)
-		glog.V(5).Infof("nginx proxy timeouts %v", prx)
+		glog.V(5).Infof("proxy timeouts annotation: %v", prx)
 
 		certAuth, err := authtls.ParseAnnotations(ing, ic.getAuthCertificate)
-		glog.V(5).Infof("nginx auth request %v", certAuth)
+		glog.V(5).Infof("auth request annotation: %v", certAuth)
 		if err != nil {
 			glog.V(3).Infof("error reading certificate auth annotation in Ingress %v/%v: %v", ing.GetNamespace(), ing.GetName(), err)
 		}
@@ -1049,7 +1049,7 @@ func (ic GenericController) Stop() error {
 
 // Start starts the Ingress controller.
 func (ic GenericController) Start() {
-	glog.Infof("starting NGINX Ingress controller")
+	glog.Infof("starting Ingress controller")
 	go ic.backend.Start()
 
 	go ic.ingController.Run(ic.stopCh)
