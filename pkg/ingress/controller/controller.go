@@ -70,8 +70,8 @@ const (
 	ingressClassKey = "kubernetes.io/ingress.class"
 )
 
-// IngressController ...
-type IngressController interface {
+// IController ...
+type IController interface {
 	Start()
 	Stop() error
 
@@ -94,7 +94,7 @@ type GenericController struct {
 	secrLister cache_store.StoreToSecretsLister
 	mapLister  cache_store.StoreToConfigmapLister
 
-	backend ingress.IController
+	backend ingress.IngressController
 
 	recorder record.EventRecorder
 
@@ -134,7 +134,7 @@ type Configuration struct {
 }
 
 // newIngressController creates an Ingress controller
-func newIngressController(config *Configuration) IngressController {
+func newIngressController(config *Configuration) IController {
 
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)

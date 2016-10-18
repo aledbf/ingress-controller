@@ -31,16 +31,34 @@ import (
 	"github.com/aledbf/ingress-controller/pkg/ingress/annotations/rewrite"
 )
 
-// IController ...
-type IController interface {
+// IngressController ...
+type IngressController interface {
+	// Ingress controller must provide a health checker
 	healthz.HealthzChecker
-
+	// Start returns the command is executed to start the backend.
+	// The command must run in foreground.
 	Start() *exec.Cmd
+	// Stop stops the backend
 	Stop() error
+	// Restart returns the command required to reload the backend.
+	// Basically the command that re-reads the configuration file.
+	// (usually send a HUP signal the process)
 	Restart() *exec.Cmd
-
+	// Tests returns a commands that checks if the configuration file is valid
+	// Example: nginx -t -c <file>
 	Test(file string) *exec.Cmd
-
+	// OnUpdate callback invoked from the sync queue https://github.com/aledbf/ingress-controller/blob/master/pkg/ingress/controller/controller.go#L355
+	// when an update occurs. This is executed frequently because an Ingress controllers watches changes in:
+	// - Ingresses: main work
+	// - Secrets: referenced from Ingress rules with TLS configured
+	// - ConfigMaps: where the controller reads custom configuration
+	// - Services: referenced from Ingress rules and required to obtain information about ports and annotations
+	// - Endpoints: referenced from Services and what the backend uses to route traffic
+	//
+	// ConfigMap content of --config-map
+	// Configuration returns the translation from Ingress rules containing information about all the upstreams (service endpoints ) "virtual" servers (FQDN)
+	// and all the locations inside each server. Each location contains information about all the annotations were configured
+	// https://github.com/aledbf/ingress-controller/blob/master/pkg/ingress/types.go#L48
 	OnUpdate(*api.ConfigMap, Configuration) error
 }
 
@@ -84,6 +102,32 @@ type UpstreamServer struct {
 	FailTimeout int
 }
 
+// Server describes a virtual server
+type Server struct {
+	Name              string
+	Locations         []*Location
+	SSL               bool
+	SSLCertificate    string
+	SSLCertificateKey string
+	SSLPemChecksum    string
+}
+
+// Location describes a server location
+type Location struct {
+	Path            string
+	IsDefBackend    bool
+	Upstream        Upstream
+	BasicDigestAuth auth.BasicDigest
+	RateLimit       ratelimit.RateLimit
+	Redirect        rewrite.Redirect
+	SecureUpstream  bool
+	Whitelist       ipwhitelist.SourceRange
+	EnableCORS      bool
+	ExternalAuth    authreq.External
+	Proxy           proxy.Configuration
+	CertificateAuth authtls.SSLCert
+}
+
 // UpstreamServerByAddrPort sorts upstream servers by address and port
 type UpstreamServerByAddrPort []UpstreamServer
 
@@ -101,16 +145,6 @@ func (c UpstreamServerByAddrPort) Less(i, j int) bool {
 	return iU < jU
 }
 
-// Server describes a virtual server
-type Server struct {
-	Name              string
-	Locations         []*Location
-	SSL               bool
-	SSLCertificate    string
-	SSLCertificateKey string
-	SSLPemChecksum    string
-}
-
 // ServerByName sorts server by name
 type ServerByName []*Server
 
@@ -118,22 +152,6 @@ func (c ServerByName) Len() int      { return len(c) }
 func (c ServerByName) Swap(i, j int) { c[i], c[j] = c[j], c[i] }
 func (c ServerByName) Less(i, j int) bool {
 	return c[i].Name < c[j].Name
-}
-
-// Location describes a server location
-type Location struct {
-	Path            string
-	IsDefBackend    bool
-	Upstream        Upstream
-	BasicDigestAuth auth.BasicDigest
-	RateLimit       ratelimit.RateLimit
-	Redirect        rewrite.Redirect
-	SecureUpstream  bool
-	Whitelist       ipwhitelist.SourceRange
-	EnableCORS      bool
-	ExternalAuth    authreq.External
-	Proxy           proxy.Configuration
-	CertificateAuth authtls.SSLCert
 }
 
 // LocationByPath sorts location by path

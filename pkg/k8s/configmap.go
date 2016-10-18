@@ -26,7 +26,9 @@ import (
 	"github.com/golang/glog"
 
 	"github.com/cbroglie/mapstructure"
-    "github.com/fatih/structs"
+	"github.com/fatih/structs"
+
+	"github.com/aledbf/ingress-controller/pkg/ingress/defaults"
 
 	"k8s.io/kubernetes/pkg/api"
 )
@@ -40,19 +42,16 @@ var (
 	camelRegexp = regexp.MustCompile("[0-9A-Za-z]+")
 )
 
-func StandarizeKeyNames(data make(map[string]interface{})) (make(map[string]interface{}){
-    return fixKeyNames(structs.Map(data))
+// StandarizeKeyNames ...
+func StandarizeKeyNames(data map[string]interface{}) map[string]interface{} {
+	return fixKeyNames(structs.Map(data))
 }
 
 // MergeConfigMapToStruct merges the content of a ConfigMap that contains
 // mapstructure tags to a struct pointer using another pointer of the same
 // type.
-func MergeConfigMapToStruct(conf *api.ConfigMap, def, to *interface{}) {
+func MergeConfigMapToStruct(conf *api.ConfigMap, def, to interface{}) {
 	//TODO: check def and to are the same type
-
-	if conf == nil || len(conf.Data) == 0 {
-		return config.NewDefault()
-	}
 
 	metadata := &mapstructure.Metadata{}
 	decoder, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
@@ -86,10 +85,8 @@ func MergeConfigMapToStruct(conf *api.ConfigMap, def, to *interface{}) {
 		glog.Infof("%v", err)
 	}
 
-	keyMap := getConfigKeyToStructKeyMap()
-
-	valCM := reflect.Indirect(reflect.ValueOf(cfgCM))
-
+	keyMap := getConfigKeyToStructKeyMap(to)
+	valCM := reflect.Indirect(reflect.ValueOf(conf))
 	for _, key := range metadata.Keys {
 		fieldName, ok := keyMap[key]
 		if !ok {
@@ -105,11 +102,15 @@ func MergeConfigMapToStruct(conf *api.ConfigMap, def, to *interface{}) {
 		}
 	}
 
-	def.CustomHTTPErrors = filterErrors(errors)
-	def.SkipAccessLogURLs = skipUrls
-	if def.Resolver == "" {
-		def.Resolver = "" //TODO: ngx.defResolver
+	b, ok := def.(defaults.Base)
+	if ok {
+		b.CustomHTTPErrors = filterErrors(errors)
+		b.SkipAccessLogURLs = skipUrls
+		if b.Resolver == "" {
+			b.Resolver = "" //TODO: ngx.defResolver
+		}
 	}
+
 }
 
 func filterErrors(errCodes []int) []int {
@@ -146,10 +147,9 @@ func toCamelCase(src string) string {
 }
 
 // getConfigKeyToStructKeyMap returns a map with the ConfigMapKey as key and the StructName as value.
-func getConfigKeyToStructKeyMap() map[string]string {
+func getConfigKeyToStructKeyMap(to interface{}) map[string]string {
 	keyMap := map[string]string{}
-	n := &config.Configuration{}
-	val := reflect.Indirect(reflect.ValueOf(n))
+	val := reflect.Indirect(reflect.ValueOf(to))
 	for i := 0; i < val.Type().NumField(); i++ {
 		fieldSt := val.Type().Field(i)
 		configMapKey := strings.Split(fieldSt.Tag.Get("structs"), ",")[0]

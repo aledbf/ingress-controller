@@ -18,20 +18,20 @@ package k8s
 
 import "testing"
 
-func StandarizeKeyNames(t *testing.T) {
+func TestStandarizeKeyNames(t *testing.T) {
 }
 
-func MergeConfigMapToStruct(t *testing.T) {
+func TestMergeConfigMapToStruct(t *testing.T) {
 }
 
-func filterErrors(t *testing.T) {
+func TestFilterErrors(t *testing.T) {
 }
 
-func fixKeyNames(t *testing.T) {
+func TestFixKeyNames(t *testing.T) {
 }
 
-func toCamelCase(t *testing.T) {
+func TestToCamelCase(t *testing.T) {
 }
 
-func getConfigKeyToStructKeyMap(t *testing.T) {
+func TestGetConfigKeyToStructKeyMap(t *testing.T) {
 }
