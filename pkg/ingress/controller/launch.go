@@ -24,7 +24,7 @@ import (
 )
 
 // NewIngressController returns a configured Ingress controller ready to start
-func NewIngressController(backend ingress.IController) IngressController {
+func NewIngressController(backend ingress.IController) IController {
 	var (
 		flags = pflag.NewFlagSet("", pflag.ExitOnError)
 
@@ -36,8 +36,8 @@ func NewIngressController(backend ingress.IController) IngressController {
 		ingressClass = flags.String("ingress-class", "nginx",
 			`Name of the ingress class to route through this controller.`)
 
-		nxgConfigMap = flags.String("nginx-configmap", "",
-			`Name of the ConfigMap that containes the custom nginx configuration to use`)
+		nxgConfigMap = flags.String("config-map", "",
+			`Name of the ConfigMap that containes the custom configuration to use`)
 
 		publishSvc = flags.String("publish-service", "",
 			`Service fronting the ingress controllers. Takes the form
@@ -155,7 +155,7 @@ func NewIngressController(backend ingress.IController) IngressController {
 	return ic
 }
 
-func registerHandlers(enableProfiling bool, port int, ic IngressController) {
+func registerHandlers(enableProfiling bool, port int, ic IController) {
 	mux := http.NewServeMux()
 	healthz.InstallHandler(mux, ic.Check())
 
