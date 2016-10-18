@@ -36,11 +36,11 @@ type IController interface {
 
 	HealthzPort() int
 
-	Start() exec.Cmd
-	Stop() exec.Cmd
-	Restart() exec.Cmd
+	Start() *exec.Cmd
+	Stop() *exec.Cmd
+	Restart() *exec.Cmd
 
-	Check(file string) exec.Cmd
+	Test(file string) *exec.Cmd
 
 	HealthzChecker() healthz.HealthzChecker
 

@@ -2,23 +2,28 @@ package controller
 
 import (
 	"flag"
+	"fmt"
+	"net/http"
+	"net/http/pprof"
 	"os"
 	"time"
 
 	"github.com/golang/glog"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/spf13/pflag"
 
 	"github.com/aledbf/ingress-controller/pkg/k8s"
 
 	"k8s.io/kubernetes/pkg/api"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/healthz"
+	kubectl_util "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
 
 // NewIngressController returns a configured Ingress controller ready to start
-func NewIngressController() (IngressController, error) {
-	healthPort := 10254
-
+func NewIngressController() IngressController {
 	var (
 		flags = pflag.NewFlagSet("", pflag.ExitOnError)
 
@@ -57,7 +62,7 @@ func NewIngressController() (IngressController, error) {
 		watchNamespace = flags.String("watch-namespace", api.NamespaceAll,
 			`Namespace to watch for Ingress. Default is to watch all namespaces`)
 
-		healthzPort = flags.Int("healthz-port", healthPort, "port for healthz endpoint.")
+		healthzPort = flags.Int("healthz-port", 10254, "port for healthz endpoint.")
 
 		profiling = flags.Bool("profiling", true, `Enable profiling via web interface host:port/debug/pprof/`)
 
@@ -135,7 +140,7 @@ func NewIngressController() (IngressController, error) {
 		DefaultService:        *defaultSvc,
 		IngressClass:          *ingressClass,
 		Namespace:             *watchNamespace,
-		NginxConfigMapName:    *nxgConfigMap,
+		ConfigMapName:         *nxgConfigMap,
 		TCPConfigMapName:      *tcpConfigMapName,
 		UDPConfigMapName:      *udpConfigMapName,
 		DefaultSSLCertificate: *defSSLCertificate,
@@ -143,5 +148,35 @@ func NewIngressController() (IngressController, error) {
 		PublishService:        *publishSvc,
 	}
 
-	return NewIngressController(config)
+	ic := newIngressController(config)
+	go registerHandlers(*profiling, *healthzPort, ic)
+	return ic
+}
+
+func registerHandlers(enableProfiling bool, port int, ic IngressController) {
+	mux := http.NewServeMux()
+	healthz.InstallHandler(mux, ic.Check())
+
+	mux.Handle("/metrics", prometheus.Handler())
+
+	mux.HandleFunc("/build", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		//fmt.Fprintf(w, "build version %v from repo %v commit %v", version.RELEASE, version.REPO, version.COMMIT)
+	})
+
+	mux.HandleFunc("/stop", func(w http.ResponseWriter, r *http.Request) {
+		ic.Stop()
+	})
+
+	if enableProfiling {
+		mux.HandleFunc("/debug/pprof/", pprof.Index)
+		mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
+		mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+	}
+
+	server := &http.Server{
+		Addr:    fmt.Sprintf(":%v", port),
+		Handler: mux,
+	}
+	glog.Fatal(server.ListenAndServe())
 }

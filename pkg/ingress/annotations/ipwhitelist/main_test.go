@@ -23,6 +23,8 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/util/intstr"
+
+	"github.com/aledbf/ingress-controller/pkg/ingress/defaults"
 )
 
 func buildIngress() *extensions.Ingress {
@@ -74,7 +76,7 @@ func TestParseAnnotations(t *testing.T) {
 		CIDR: enet,
 	}
 
-	sr, err := ParseAnnotations([]string{}, ing)
+	sr, err := ParseAnnotations(defaults.Upstream{}, ing)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -85,19 +87,19 @@ func TestParseAnnotations(t *testing.T) {
 
 	data[whitelist] = "www"
 	ing.SetAnnotations(data)
-	_, err = ParseAnnotations([]string{}, ing)
+	_, err = ParseAnnotations(defaults.Upstream{}, ing)
 	if err == nil {
 		t.Errorf("Expected error parsing an invalid cidr")
 	}
 
 	delete(data, "whitelist")
 	ing.SetAnnotations(data)
-	sr, _ = ParseAnnotations([]string{}, ing)
+	sr, _ = ParseAnnotations(defaults.Upstream{}, ing)
 	if !reflect.DeepEqual(sr.CIDR, []string{}) {
 		t.Errorf("Expected empty CIDR but %v returned", sr.CIDR)
 	}
 
-	sr, _ = ParseAnnotations([]string{}, &extensions.Ingress{})
+	sr, _ = ParseAnnotations(defaults.Upstream{}, &extensions.Ingress{})
 	if !reflect.DeepEqual(sr.CIDR, []string{}) {
 		t.Errorf("Expected empty CIDR but %v returned", sr.CIDR)
 	}

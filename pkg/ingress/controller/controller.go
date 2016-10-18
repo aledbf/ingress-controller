@@ -51,6 +51,7 @@ import (
 	"github.com/aledbf/ingress-controller/pkg/ingress/annotations/rewrite"
 	"github.com/aledbf/ingress-controller/pkg/ingress/annotations/secureupstream"
 	"github.com/aledbf/ingress-controller/pkg/ingress/annotations/service"
+	"github.com/aledbf/ingress-controller/pkg/ingress/defaults"
 	"github.com/aledbf/ingress-controller/pkg/ingress/status"
 	"github.com/aledbf/ingress-controller/pkg/k8s"
 	ssl "github.com/aledbf/ingress-controller/pkg/net/ssl"
@@ -65,9 +66,8 @@ const (
 
 	// ingressClassKey picks a specific "class" for the Ingress. The controller
 	// only processes Ingresses with this annotation either unset, or set
-	// to either nginxIngressClass or the empty string.
-	ingressClassKey   = "kubernetes.io/ingress.class"
-	nginxIngressClass = "nginx"
+	// to either the configured value or the empty string.
+	ingressClassKey = "kubernetes.io/ingress.class"
 )
 
 // IngressController ...
@@ -102,6 +102,8 @@ type GenericController struct {
 
 	syncStatus status.Sync
 
+	sslDirectory string
+
 	// stopLock is used to enforce only a single call to Stop is active.
 	// Needed because we allow stopping through an http endpoint and
 	// allowing concurrent stoppers leads to stack traces.
@@ -126,11 +128,11 @@ type Configuration struct {
 	DefaultHealthzURL     string
 	PublishService        string
 
-	UpstreamDefaults ingress.UpstreamDefaults
+	UpstreamDefaults defaults.Upstream
 }
 
-// newLoadBalancer creates a controller for nginx loadbalancer
-func newLoadBalancer(config *Configuration) (IngressController, error) {
+// newIngressController creates a controller for nginx loadbalancer
+func newIngressController(config *Configuration) IngressController {
 
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
@@ -298,7 +300,7 @@ func newLoadBalancer(config *Configuration) (IngressController, error) {
 	})
 	ic.syncQueue = task.NewTaskQueue(ic.sync)
 
-	return ic, nil
+	return ic
 }
 
 func (ic *GenericController) controllersInSync() bool {
@@ -316,7 +318,7 @@ func (ic *GenericController) getConfigMap(ns, name string) (*api.ConfigMap, erro
 
 // Check returns if the healthz endpoint is returning ok (status code 200)
 func (ic GenericController) Check() healthz.HealthzChecker {
-	return *ic.backend.HealthzChecker
+	return ic.backend.(healthz.HealthzChecker)
 }
 
 func (ic *GenericController) sync(key interface{}) error {
@@ -330,23 +332,23 @@ func (ic *GenericController) sync(key interface{}) error {
 	}
 
 	// by default no custom configuration configmap
-	cfg := &api.ConfigMap{}
+	//cfg := &api.ConfigMap{}
 
-	if ic.cfg.ConfigMapName != "" {
-		// Search for custom configmap (defined in main args)
-		var err error
-		ns, name, _ := k8s.ParseNameNS(ic.cfg.ConfigMapName)
-		cfg, err = ic.getConfigMap(ns, name)
-		if err != nil {
-			return fmt.Errorf("unexpected error searching configmap %v: %v", ic.cfg.ConfigMapName, err)
+	/*	if ic.cfg.ConfigMapName != "" {
+			// Search for custom configmap (defined in main args)
+			var err error
+			ns, name, _ := k8s.ParseNameNS(ic.cfg.ConfigMapName)
+			cfg, err = ic.getConfigMap(ns, name)
+			if err != nil {
+				return fmt.Errorf("unexpected error searching configmap %v: %v", ic.cfg.ConfigMapName, err)
+			}
 		}
-	}
-
-	ngxConfig := ic.backend.ReadConfig(cfg)
+	*/
+	//ngxConfig := ic.backend.ReadConfig(cfg)
 	//ngxConfig.HealthzURL = ic.cfg.DefaultHealthzURL
 
 	ings := ic.ingLister.Store.List()
-	upstreams, servers := ic.getUpstreamServers(ngxConfig, ings)
+	upstreams, servers := ic.getUpstreamServers(ings)
 
 	err := ic.backend.OnUpdate(ingress.Configuration{
 		Upstreams:    upstreams,
@@ -358,7 +360,13 @@ func (ic *GenericController) sync(key interface{}) error {
 		return err
 	}
 
-	return ic.backend.Restart()
+	out, err := ic.backend.Restart().CombinedOutput()
+	if err != nil {
+		glog.Errorf("unexpected failure restarting the backend: \n%v", string(out))
+		return err
+	}
+
+	return nil
 }
 
 func (ic *GenericController) getTCPServices() []*ingress.Location {
@@ -521,8 +529,8 @@ func (ic *GenericController) getDefaultUpstream() *ingress.Upstream {
 // getUpstreamServers returns a list of Upstream and Server to be used by the backend
 // An upstream can be used in multiple servers if the namespace, service name and port are the same
 func (ic *GenericController) getUpstreamServers(data []interface{}) ([]*ingress.Upstream, []*ingress.Server) {
-	upstreams := ic.createUpstreams(ic.UpstreamDefaults, data)
-	servers := ic.createServers(ic.UpstreamDefaults, data, upstreams)
+	upstreams := ic.createUpstreams(data)
+	servers := ic.createServers(data, upstreams)
 
 	for _, ingIf := range data {
 		ing := ingIf.(*extensions.Ingress)
@@ -544,12 +552,12 @@ func (ic *GenericController) getUpstreamServers(data []interface{}) ([]*ingress.
 			glog.V(5).Infof("error reading secure upstream in Ingress %v/%v: %v", ing.GetNamespace(), ing.GetName(), err)
 		}
 
-		locRew, err := rewrite.ParseAnnotations(cfg, ing)
+		locRew, err := rewrite.ParseAnnotations(ic.cfg.UpstreamDefaults, ing)
 		if err != nil {
 			glog.V(5).Infof("error parsing rewrite annotations for Ingress rule %v/%v: %v", ing.GetNamespace(), ing.GetName(), err)
 		}
 
-		wl, err := ipwhitelist.ParseAnnotations(cfg.WhitelistSourceRange, ing)
+		wl, err := ipwhitelist.ParseAnnotations(ic.cfg.UpstreamDefaults, ing)
 		glog.V(5).Infof("nginx white list %v", wl)
 		if err != nil {
 			glog.V(5).Infof("error reading white list annotation in Ingress %v/%v: %v", ing.GetNamespace(), ing.GetName(), err)
@@ -566,7 +574,7 @@ func (ic *GenericController) getUpstreamServers(data []interface{}) ([]*ingress.
 			glog.V(5).Infof("error reading auth request annotation in Ingress %v/%v: %v", ing.GetNamespace(), ing.GetName(), err)
 		}
 
-		prx := proxy.ParseAnnotations(ngxCfg, ing)
+		prx := proxy.ParseAnnotations(ic.cfg.UpstreamDefaults, ing)
 		glog.V(5).Infof("nginx proxy timeouts %v", prx)
 
 		certAuth, err := authtls.ParseAnnotations(ing, ic.getAuthCertificate)
@@ -713,7 +721,7 @@ func (ic *GenericController) createUpstreams(data []interface{}) map[string]*ing
 	for _, ingIf := range data {
 		ing := ingIf.(*extensions.Ingress)
 
-		hz := healthcheck.ParseAnnotations(ic.UpstreamDefaults, ing)
+		hz := healthcheck.ParseAnnotations(ic.cfg.UpstreamDefaults, ing)
 
 		var defBackend string
 		if ing.Spec.Backend != nil {
@@ -803,12 +811,12 @@ func (ic *GenericController) createServers(data []interface{}, upstreams map[str
 	if ic.cfg.DefaultSSLCertificate == "" {
 		// use system certificated generated at image build time
 		cert, key := ssl.GetFakeSSLCert()
-		ngxCert, err = ssl.AddOrUpdateCertAndKey("system-snake-oil-certificate", cert, key, "")
+		ngxCert, err = ssl.AddOrUpdateCertAndKey("system-snake-oil-certificate", cert, key, "", ic.sslDirectory)
 	} else {
 		ngxCert, err = ic.getPemCertificate(ic.cfg.DefaultSSLCertificate)
 	}
 
-	ngxProxy := *proxy.ParseAnnotations(ic.UpstreamDefaults, nil)
+	ngxProxy := *proxy.ParseAnnotations(ic.cfg.UpstreamDefaults, nil)
 
 	locs := []*ingress.Location{}
 	locs = append(locs, &ingress.Location{
@@ -932,7 +940,7 @@ func (ic *GenericController) getPemCertificate(secretName string) (ingress.SSLCe
 	ca := secret.Data["ca.crt"]
 
 	nsSecName := strings.Replace(secretName, "/", "-", -1)
-	return ssl.AddOrUpdateCertAndKey(nsSecName, string(cert), string(key), string(ca))
+	return ssl.AddOrUpdateCertAndKey(nsSecName, string(cert), string(key), string(ca), ic.sslDirectory)
 }
 
 // check if secret is referenced in this controller's config
