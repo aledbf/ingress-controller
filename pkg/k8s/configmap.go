@@ -102,7 +102,7 @@ func MergeConfigMapToStruct(conf *api.ConfigMap, def, to interface{}) {
 		}
 	}
 
-	b, ok := def.(defaults.Base)
+	b, ok := def.(defaults.Backend)
 	if ok {
 		b.CustomHTTPErrors = filterErrors(errors)
 		b.SkipAccessLogURLs = skipUrls
