@@ -43,7 +43,7 @@ var (
 )
 
 // StandarizeKeyNames ...
-func StandarizeKeyNames(data map[string]interface{}) map[string]interface{} {
+func StandarizeKeyNames(data interface{}) map[string]interface{} {
 	return fixKeyNames(structs.Map(data))
 }
 
