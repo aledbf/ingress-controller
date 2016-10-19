@@ -20,6 +20,8 @@ before_install:
   - sudo bash -c 'sysctl net.ipv6.conf.all.disable_ipv6=0'
   - sudo bash -c 'sysctl net.ipv6.conf.default.disable_ipv6=0'
   - sudo bash -c 'sysctl net.ipv6.conf.lo.disable_ipv6=0'
+  - sudo mkdir -p /ingress-controller/ssl
+  - sudo chmod 777 -R /ingress-controller
 
 install:
   - go get github.com/golang/lint/golint
