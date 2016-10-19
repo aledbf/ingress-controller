@@ -92,11 +92,8 @@ func MergeConfigMapToStruct(conf *api.ConfigMap, def, to interface{}) {
 		if !ok {
 			continue
 		}
-
-		valDefault := reflect.ValueOf(&def).Elem().FieldByName(fieldName)
-
+		valDefault := reflect.ValueOf(def).Elem().FieldByName(fieldName)
 		fieldCM := valCM.FieldByName(fieldName)
-
 		if valDefault.IsValid() {
 			valDefault.Set(fieldCM)
 		}
