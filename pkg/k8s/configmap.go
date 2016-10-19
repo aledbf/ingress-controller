@@ -17,9 +17,7 @@ limitations under the License.
 package k8s
 
 import (
-	"bytes"
 	"reflect"
-	"regexp"
 	"strconv"
 	"strings"
 
@@ -27,6 +25,7 @@ import (
 
 	"github.com/cbroglie/mapstructure"
 	"github.com/fatih/structs"
+	go_camelcase "github.com/segmentio/go-camelcase"
 
 	"github.com/aledbf/ingress-controller/pkg/ingress/defaults"
 
@@ -36,10 +35,6 @@ import (
 const (
 	customHTTPErrors  = "custom-http-errors"
 	skipAccessLogUrls = "skip-access-log-urls"
-)
-
-var (
-	camelRegexp = regexp.MustCompile("[0-9A-Za-z]+")
 )
 
 // StandarizeKeyNames ...
@@ -126,21 +121,10 @@ func filterErrors(errCodes []int) []int {
 func fixKeyNames(data map[string]interface{}) map[string]interface{} {
 	fixed := make(map[string]interface{})
 	for k, v := range data {
-		fixed[toCamelCase(k)] = v
+		fixed[go_camelcase.Camelcase(k)] = v
 	}
 
 	return fixed
-}
-
-func toCamelCase(src string) string {
-	byteSrc := []byte(src)
-	chunks := camelRegexp.FindAll(byteSrc, -1)
-	for idx, val := range chunks {
-		if idx > 0 {
-			chunks[idx] = bytes.Title(val)
-		}
-	}
-	return string(bytes.Join(chunks, nil))
 }
 
 // getConfigKeyToStructKeyMap returns a map with the ConfigMapKey as key and the StructName as value.
