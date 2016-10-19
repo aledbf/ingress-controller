@@ -20,7 +20,6 @@ import (
 	"os/exec"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/healthz"
 
 	"github.com/aledbf/ingress-controller/pkg/ingress/annotations/auth"
 	"github.com/aledbf/ingress-controller/pkg/ingress/annotations/authreq"
@@ -31,10 +30,12 @@ import (
 	"github.com/aledbf/ingress-controller/pkg/ingress/annotations/rewrite"
 )
 
+const (
+	DefaultSSLDirectory = "/ingress-controller/ssl"
+)
+
 // IngressController ...
 type IngressController interface {
-	// Ingress controller must provide a health checker
-	healthz.HealthzChecker
 	// Start returns the command is executed to start the backend.
 	// The command must run in foreground.
 	Start() *exec.Cmd

@@ -134,6 +134,8 @@ func NewIngressController(backend ingress.IngressController) IController {
 		}
 	}
 
+	os.MkdirAll(ingress.DefaultSSLDirectory, 0655)
+
 	config := &Configuration{
 		Client:                kubeClient,
 		ElectionClient:        leaderElectionClient,
@@ -157,7 +159,7 @@ func NewIngressController(backend ingress.IngressController) IController {
 
 func registerHandlers(enableProfiling bool, port int, ic IController) {
 	mux := http.NewServeMux()
-	healthz.InstallHandler(mux, ic.Check())
+	healthz.InstallHandler(mux, ic)
 
 	mux.Handle("/metrics", prometheus.Handler())
 

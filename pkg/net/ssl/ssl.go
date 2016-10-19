@@ -33,9 +33,9 @@ import (
 )
 
 // AddOrUpdateCertAndKey creates a .pem file wth the cert and the key with the specified name
-func AddOrUpdateCertAndKey(name string, cert string, key string, ca string, sslDirectory string) (ingress.SSLCert, error) {
+func AddOrUpdateCertAndKey(name string, cert string, key string, ca string) (ingress.SSLCert, error) {
 	pemName := fmt.Sprintf("%v.pem", name)
-	pemFileName := fmt.Sprintf("%v/%v", sslDirectory, pemName)
+	pemFileName := fmt.Sprintf("%v/%v", ingress.DefaultSSLDirectory, pemName)
 
 	tempPemFile, err := ioutil.TempFile("", pemName)
 	if err != nil {

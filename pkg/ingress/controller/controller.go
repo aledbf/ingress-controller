@@ -18,6 +18,7 @@ package controller
 
 import (
 	"fmt"
+	"net/http"
 	"reflect"
 	"sort"
 	"strconv"
@@ -75,11 +76,13 @@ type IController interface {
 	Start()
 	Stop() error
 
-	Check() healthz.HealthzChecker
+	healthz.HealthzChecker
 }
 
 // GenericController watches the kubernetes api and adds/removes services from the loadbalancer
 type GenericController struct {
+	healthz.HealthzChecker
+
 	cfg *Configuration
 
 	ingController  *cache.Controller
@@ -94,15 +97,11 @@ type GenericController struct {
 	secrLister cache_store.StoreToSecretsLister
 	mapLister  cache_store.StoreToConfigmapLister
 
-	backend ingress.IngressController
-
 	recorder record.EventRecorder
 
 	syncQueue *task.Queue
 
 	syncStatus status.Sync
-
-	sslDirectory string
 
 	// stopLock is used to enforce only a single call to Stop is active.
 	// Needed because we allow stopping through an http endpoint and
@@ -313,14 +312,27 @@ func (ic *GenericController) controllersInSync() bool {
 		ic.mapController.HasSynced()
 }
 
+// Name returns the healthcheck name
+func (ic GenericController) Name() string {
+	return "Ingress Controller"
+}
+
+// Check returns if the nginx healthz endpoint is returning ok (status code 200)
+func (ic GenericController) Check(_ *http.Request) error {
+	res, err := http.Get("http://127.0.0.1:18080/healthz")
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+	if res.StatusCode != 200 {
+		return fmt.Errorf("Ingress controller is not healthy")
+	}
+	return nil
+}
+
 func (ic *GenericController) getConfigMap(ns, name string) (*api.ConfigMap, error) {
 	// TODO: check why ic.mapLister.Store.GetByKey(mapKey) is not stable (random content)
 	return ic.cfg.Client.ConfigMaps(ns).Get(name)
-}
-
-// Check returns if the healthz endpoint is returning ok (status code 200)
-func (ic GenericController) Check() healthz.HealthzChecker {
-	return ic.backend.(healthz.HealthzChecker)
 }
 
 func (ic *GenericController) sync(key interface{}) error {
@@ -352,7 +364,7 @@ func (ic *GenericController) sync(key interface{}) error {
 	ings := ic.ingLister.Store.List()
 	upstreams, servers := ic.getUpstreamServers(ings)
 
-	err := ic.backend.OnUpdate(cfg, ingress.Configuration{
+	err := ic.cfg.Backend.OnUpdate(cfg, ingress.Configuration{
 		Upstreams:    upstreams,
 		Servers:      servers,
 		TCPUpstreams: ic.getTCPServices(),
@@ -362,7 +374,7 @@ func (ic *GenericController) sync(key interface{}) error {
 		return err
 	}
 
-	out, err := ic.backend.Restart().CombinedOutput()
+	out, err := ic.cfg.Backend.Restart().CombinedOutput()
 	if err != nil {
 		glog.Errorf("unexpected failure restarting the backend: \n%v", string(out))
 		return err
@@ -813,7 +825,7 @@ func (ic *GenericController) createServers(data []interface{}, upstreams map[str
 	if ic.cfg.DefaultSSLCertificate == "" {
 		// use system certificated generated at image build time
 		cert, key := ssl.GetFakeSSLCert()
-		ngxCert, err = ssl.AddOrUpdateCertAndKey("system-snake-oil-certificate", cert, key, "", ic.sslDirectory)
+		ngxCert, err = ssl.AddOrUpdateCertAndKey("system-snake-oil-certificate", cert, key, "")
 	} else {
 		ngxCert, err = ic.getPemCertificate(ic.cfg.DefaultSSLCertificate)
 	}
@@ -942,7 +954,7 @@ func (ic *GenericController) getPemCertificate(secretName string) (ingress.SSLCe
 	ca := secret.Data["ca.crt"]
 
 	nsSecName := strings.Replace(secretName, "/", "-", -1)
-	return ssl.AddOrUpdateCertAndKey(nsSecName, string(cert), string(key), string(ca), ic.sslDirectory)
+	return ssl.AddOrUpdateCertAndKey(nsSecName, string(cert), string(key), string(ca))
 }
 
 // check if secret is referenced in this controller's config
@@ -1050,7 +1062,7 @@ func (ic GenericController) Stop() error {
 // Start starts the Ingress controller.
 func (ic GenericController) Start() {
 	glog.Infof("starting Ingress controller")
-	go ic.backend.Start()
+	go ic.cfg.Backend.Start()
 
 	go ic.ingController.Run(ic.stopCh)
 	go ic.endpController.Run(ic.stopCh)
