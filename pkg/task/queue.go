@@ -51,6 +51,7 @@ func (t *Queue) Run(period time.Duration, stopCh <-chan struct{}) {
 
 // Enqueue enqueues ns/name of the given api object in the task queue.
 func (t *Queue) Enqueue(obj interface{}) {
+	glog.V(3).Infof("queuing item %v", obj)
 	key, err := t.fn(obj)
 	if err != nil {
 		glog.Errorf("%v", err)

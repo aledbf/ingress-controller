@@ -36,6 +36,7 @@ import (
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/healthz"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/watch"
 
@@ -102,6 +103,8 @@ type GenericController struct {
 
 	syncStatus status.Sync
 
+	syncRateLimiter flowcontrol.RateLimiter
+
 	// stopLock is used to enforce only a single call to Stop is active.
 	// Needed because we allow stopping through an http endpoint and
 	// allowing concurrent stoppers leads to stack traces.
@@ -137,11 +140,12 @@ func newIngressController(config *Configuration) IController {
 	eventBroadcaster.StartRecordingToSink(config.Client.Events(config.Namespace))
 
 	ic := GenericController{
-		cfg:      config,
-		stopLock: &sync.Mutex{},
-		stopCh:   make(chan struct{}),
+		cfg:             config,
+		stopLock:        &sync.Mutex{},
+		stopCh:          make(chan struct{}),
+		syncRateLimiter: flowcontrol.NewTokenBucketRateLimiter(0.1, 1),
 		recorder: eventBroadcaster.NewRecorder(api.EventSource{
-			Component: "nginx-ingress-controller",
+			Component: "ingress-controller",
 		}),
 	}
 
@@ -333,6 +337,8 @@ func (ic *GenericController) getConfigMap(ns, name string) (*api.ConfigMap, erro
 }
 
 func (ic *GenericController) sync(key interface{}) error {
+	ic.syncRateLimiter.Accept()
+
 	if ic.syncQueue.IsShuttingDown() {
 		return nil
 	}

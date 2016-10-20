@@ -57,7 +57,7 @@ func NewIngressController(backend ingress.Controller) IController {
 		service with the format namespace/serviceName and the port of the service could be a 
 		number of the name of the port.`)
 
-		resyncPeriod = flags.Duration("sync-period", 30*time.Second,
+		resyncPeriod = flags.Duration("sync-period", 60*time.Second,
 			`Relist and confirm cloud resources this often.`)
 
 		watchNamespace = flags.String("watch-namespace", api.NamespaceAll,
@@ -176,6 +176,7 @@ func registerHandlers(enableProfiling bool, port int, ic IController) {
 		mux.HandleFunc("/debug/pprof/", pprof.Index)
 		mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
 		mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+		mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
 	}
 
 	server := &http.Server{
