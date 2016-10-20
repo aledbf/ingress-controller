@@ -67,7 +67,7 @@ func buildIngress() *extensions.Ingress {
 
 func TestWithoutAnnotations(t *testing.T) {
 	ing := buildIngress()
-	_, err := ParseAnnotations(defaults.Upstream{}, ing)
+	_, err := ParseAnnotations(defaults.Backend{}, ing)
 	if err == nil {
 		t.Error("Expected error with ingress without annotations")
 	}
@@ -80,7 +80,7 @@ func TestRedirect(t *testing.T) {
 	data[rewriteTo] = defRoute
 	ing.SetAnnotations(data)
 
-	redirect, err := ParseAnnotations(defaults.Upstream{}, ing)
+	redirect, err := ParseAnnotations(defaults.Backend{}, ing)
 	if err != nil {
 		t.Errorf("Uxpected error with ingress: %v", err)
 	}
@@ -93,7 +93,7 @@ func TestRedirect(t *testing.T) {
 func TestSSLRedirect(t *testing.T) {
 	ing := buildIngress()
 
-	cfg := defaults.Upstream{Secure: true}
+	cfg := defaults.Backend{SSLRedirect: true}
 
 	data := map[string]string{}
 
