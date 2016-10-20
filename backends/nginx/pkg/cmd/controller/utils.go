@@ -17,6 +17,10 @@ limitations under the License.
 package main
 
 import (
+	"io/ioutil"
+	"os"
+	"os/exec"
+
 	"k8s.io/kubernetes/pkg/util/sysctl"
 
 	"github.com/golang/glog"
@@ -33,4 +37,29 @@ func sysctlSomaxconn() int {
 	}
 
 	return maxConns
+}
+
+func diff(b1, b2 []byte) (data []byte, err error) {
+	f1, err := ioutil.TempFile("", "")
+	if err != nil {
+		return
+	}
+	defer os.Remove(f1.Name())
+	defer f1.Close()
+
+	f2, err := ioutil.TempFile("", "")
+	if err != nil {
+		return
+	}
+	defer os.Remove(f2.Name())
+	defer f2.Close()
+
+	f1.Write(b1)
+	f2.Write(b2)
+
+	data, err = exec.Command("diff", "-u", f1.Name(), f2.Name()).CombinedOutput()
+	if len(data) > 0 {
+		err = nil
+	}
+	return
 }

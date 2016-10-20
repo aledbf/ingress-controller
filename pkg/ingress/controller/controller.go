@@ -126,7 +126,7 @@ type Configuration struct {
 	DefaultHealthzURL     string
 	PublishService        string
 
-	Backend ingress.IngressController
+	Backend ingress.Controller
 }
 
 // newIngressController creates an Ingress controller
@@ -358,7 +358,7 @@ func (ic *GenericController) sync(key interface{}) error {
 	ings := ic.ingLister.Store.List()
 	upstreams, servers := ic.getUpstreamServers(ings)
 
-	err := ic.cfg.Backend.OnUpdate(cfg, ingress.Configuration{
+	data, err := ic.cfg.Backend.OnUpdate(cfg, ingress.Configuration{
 		HealthzURL:   ic.cfg.DefaultHealthzURL,
 		Upstreams:    upstreams,
 		Servers:      servers,
@@ -369,12 +369,14 @@ func (ic *GenericController) sync(key interface{}) error {
 		return err
 	}
 
-	out, err := ic.cfg.Backend.Restart().CombinedOutput()
+	if !ic.cfg.Backend.IsReloadRequired(data) {
+		return nil
+	}
+	out, err := ic.cfg.Backend.Restart(data)
 	if err != nil {
 		glog.Errorf("unexpected failure restarting the backend: \n%v", string(out))
 		return err
 	}
-
 	return nil
 }
 

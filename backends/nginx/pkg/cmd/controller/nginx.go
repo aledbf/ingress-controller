@@ -17,6 +17,7 @@ limitations under the License.
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -39,7 +40,7 @@ var (
 	binary   = "/usr/sbin/nginx"
 )
 
-func newNGINXController() ingress.IngressController {
+func newNGINXController() ingress.Controller {
 	ngx := os.Getenv("NGINX_BINARY")
 	if ngx == "" {
 		ngx = binary
@@ -95,8 +96,13 @@ func (n NGINXController) Stop() error {
 }
 
 // Restart ...
-func (n NGINXController) Restart() *exec.Cmd {
-	return exec.Command(n.binary, "-s", "reload")
+func (n NGINXController) Restart(data []byte) ([]byte, error) {
+	err := ioutil.WriteFile(cfgPath, data, 0644)
+	if err != nil {
+		return nil, err
+	}
+
+	return exec.Command(n.binary, "-s", "reload").CombinedOutput()
 }
 
 // Test ...
@@ -107,6 +113,46 @@ func (n NGINXController) Test(file string) *exec.Cmd {
 func (n NGINXController) UpstreamDefaults() defaults.Backend {
 	d := config.NewDefault()
 	return d.Backend
+}
+
+// IsReloadRequired check if the new configuration file is different
+// from the current one.
+func (n NGINXController) IsReloadRequired(data []byte) bool {
+	in, err := os.Open(cfgPath)
+	if err != nil {
+		return false
+	}
+	src, err := ioutil.ReadAll(in)
+	in.Close()
+	if err != nil {
+		return false
+	}
+
+	if !bytes.Equal(src, data) {
+		tmpfile, err := ioutil.TempFile("", "nginx-cfg-diff")
+		if err != nil {
+			glog.Errorf("error creating temporal file: %s", err)
+			return false
+		}
+		defer tmpfile.Close()
+		err = ioutil.WriteFile(tmpfile.Name(), data, 0644)
+		if err != nil {
+			return false
+		}
+
+		diffOutput, err := diff(src, data)
+		if err != nil {
+			glog.Errorf("error computing diff: %s", err)
+			return true
+		}
+
+		if glog.V(2) {
+			glog.Infof("NGINX configuration diff\n")
+			glog.Infof("%v", string(diffOutput))
+		}
+		return len(diffOutput) > 0
+	}
+	return false
 }
 
 // testTemplate checks if the NGINX configuration inside the byte array is valid
@@ -140,7 +186,7 @@ Error: %v
 // write the configuration file
 // returning nill implies the backend will be reloaded.
 // if an error is returned means requeue the update
-func (n NGINXController) OnUpdate(cmap *api.ConfigMap, ingressCfg ingress.Configuration) error {
+func (n NGINXController) OnUpdate(cmap *api.ConfigMap, ingressCfg ingress.Configuration) ([]byte, error) {
 	var longestName int
 	var serverNames int
 	for _, srv := range ingressCfg.Servers {
@@ -184,11 +230,7 @@ func (n NGINXController) OnUpdate(cmap *api.ConfigMap, ingressCfg ingress.Config
 	conf["customErrors"] = len(cfg.CustomHTTPErrors) > 0
 	conf["cfg"] = ngx_template.StandarizeKeyNames(cfg)
 
-	data, err := n.t.Write(conf, n.testTemplate)
-	if err != nil {
-		return err
-	}
-	return ioutil.WriteFile(cfgPath, data, 0644)
+	return n.t.Write(conf, n.testTemplate)
 }
 
 // http://graphics.stanford.edu/~seander/bithacks.html#RoundUpPowerOf2

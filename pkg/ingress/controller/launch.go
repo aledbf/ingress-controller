@@ -24,7 +24,7 @@ import (
 )
 
 // NewIngressController returns a configured Ingress controller ready to start
-func NewIngressController(backend ingress.IngressController) IController {
+func NewIngressController(backend ingress.Controller) IController {
 	var (
 		flags = pflag.NewFlagSet("", pflag.ExitOnError)
 

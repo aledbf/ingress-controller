@@ -35,35 +35,44 @@ const (
 	DefaultSSLDirectory = "/ingress-controller/ssl"
 )
 
-// IngressController ...
-type IngressController interface {
+// Controller ...
+type Controller interface {
 	// Start returns the command is executed to start the backend.
 	// The command must run in foreground.
 	Start()
 	// Stop stops the backend
 	Stop() error
-	// Restart returns the command required to reload the backend.
-	// Basically the command that re-reads the configuration file.
-	// (usually send a HUP signal the process)
-	Restart() *exec.Cmd
+	// Restart reload the backend with the a configuration file returning
+	// the combined output of Stdout and Stderr
+	Restart(data []byte) ([]byte, error)
 	// Tests returns a commands that checks if the configuration file is valid
 	// Example: nginx -t -c <file>
 	Test(file string) *exec.Cmd
 	// OnUpdate callback invoked from the sync queue https://github.com/aledbf/ingress-controller/blob/master/pkg/ingress/controller/controller.go#L355
-	// when an update occurs. This is executed frequently because an Ingress controllers watches changes in:
+	// when an update occurs. This is executed frequently because Ingress
+	// controllers watches changes in:
 	// - Ingresses: main work
 	// - Secrets: referenced from Ingress rules with TLS configured
 	// - ConfigMaps: where the controller reads custom configuration
-	// - Services: referenced from Ingress rules and required to obtain information about ports and annotations
-	// - Endpoints: referenced from Services and what the backend uses to route traffic
+	// - Services: referenced from Ingress rules and required to obtain
+	//	 information about ports and annotations
+	// - Endpoints: referenced from Services and what the backend uses
+	//	 to route traffic
 	//
 	// ConfigMap content of --config-map
-	// Configuration returns the translation from Ingress rules containing information about all the upstreams (service endpoints ) "virtual" servers (FQDN)
-	// and all the locations inside each server. Each location contains information about all the annotations were configured
+	// Configuration returns the translation from Ingress rules containing
+	// information about all the upstreams (service endpoints ) "virtual"
+	// servers (FQDN)
+	// and all the locations inside each server. Each location contains
+	// information about all the annotations were configured
 	// https://github.com/aledbf/ingress-controller/blob/master/pkg/ingress/types.go#L48
-	OnUpdate(*api.ConfigMap, Configuration) error
-
+	OnUpdate(*api.ConfigMap, Configuration) ([]byte, error)
+	// UpstreamDefaults returns the minimum settings required to configure the
+	// communication to upstream servers (endpoints)
 	UpstreamDefaults() defaults.Backend
+	// IsReloadRequired checks if the backend must be reloaded or not.
+	// The parameter contains the new rendered template
+	IsReloadRequired([]byte) bool
 }
 
 // Configuration describes
@@ -121,13 +130,13 @@ type Server struct {
 type Location struct {
 	Path            string
 	IsDefBackend    bool
+	SecureUpstream  bool
+	EnableCORS      bool
 	Upstream        Upstream
 	BasicDigestAuth auth.BasicDigest
 	RateLimit       ratelimit.RateLimit
 	Redirect        rewrite.Redirect
-	SecureUpstream  bool
 	Whitelist       ipwhitelist.SourceRange
-	EnableCORS      bool
 	ExternalAuth    authreq.External
 	Proxy           proxy.Configuration
 	CertificateAuth authtls.SSLCert
