@@ -28,6 +28,7 @@ import (
 	"github.com/aledbf/ingress-controller/pkg/ingress/annotations/proxy"
 	"github.com/aledbf/ingress-controller/pkg/ingress/annotations/ratelimit"
 	"github.com/aledbf/ingress-controller/pkg/ingress/annotations/rewrite"
+	"github.com/aledbf/ingress-controller/pkg/ingress/defaults"
 )
 
 const (
@@ -38,7 +39,7 @@ const (
 type IngressController interface {
 	// Start returns the command is executed to start the backend.
 	// The command must run in foreground.
-	Start() *exec.Cmd
+	Start()
 	// Stop stops the backend
 	Stop() error
 	// Restart returns the command required to reload the backend.
@@ -61,10 +62,13 @@ type IngressController interface {
 	// and all the locations inside each server. Each location contains information about all the annotations were configured
 	// https://github.com/aledbf/ingress-controller/blob/master/pkg/ingress/types.go#L48
 	OnUpdate(*api.ConfigMap, Configuration) error
+
+	UpstreamDefaults() defaults.Backend
 }
 
 // Configuration describes
 type Configuration struct {
+	HealthzURL   string
 	Upstreams    []*Upstream
 	Servers      []*Server
 	TCPUpstreams []*Location

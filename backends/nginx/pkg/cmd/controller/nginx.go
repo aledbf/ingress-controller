@@ -25,7 +25,9 @@ import (
 	"github.com/golang/glog"
 
 	"github.com/aledbf/ingress-controller/pkg/ingress"
+	"github.com/aledbf/ingress-controller/pkg/ingress/defaults"
 
+	"github.com/aledbf/ingress-controller/backends/nginx/pkg/config"
 	ngx_template "github.com/aledbf/ingress-controller/backends/nginx/pkg/template"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -73,8 +75,17 @@ type NGINXController struct {
 }
 
 // Start ...
-func (n NGINXController) Start() *exec.Cmd {
-	return exec.Command(n.binary, "-c", cfgPath)
+func (n NGINXController) Start() {
+	glog.Info("Starting NGINX process...")
+	cmd := exec.Command(n.binary, "-c", cfgPath)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Start(); err != nil {
+		glog.Fatalf("nginx error: %v", err)
+	}
+	if err := cmd.Wait(); err != nil {
+		glog.Errorf("nginx error: %v", err)
+	}
 }
 
 // Stop ...
@@ -91,6 +102,11 @@ func (n NGINXController) Restart() *exec.Cmd {
 // Test ...
 func (n NGINXController) Test(file string) *exec.Cmd {
 	return exec.Command(n.binary, "-t", "-c", file)
+}
+
+func (n NGINXController) UpstreamDefaults() defaults.Backend {
+	d := config.NewDefault()
+	return d.Backend
 }
 
 // testTemplate checks if the NGINX configuration inside the byte array is valid
@@ -162,6 +178,7 @@ func (n NGINXController) OnUpdate(cmap *api.ConfigMap, ingressCfg ingress.Config
 	conf["servers"] = ingressCfg.Servers
 	conf["tcpUpstreams"] = ingressCfg.TCPUpstreams
 	conf["udpUpstreams"] = ingressCfg.UDPUpstreams
+	conf["healthzURL"] = ingressCfg.HealthzURL
 	conf["defResolver"] = cfg.Resolver
 	conf["sslDHParam"] = ""
 	conf["customErrors"] = len(cfg.CustomHTTPErrors) > 0

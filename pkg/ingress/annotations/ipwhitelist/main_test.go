@@ -76,7 +76,7 @@ func TestParseAnnotations(t *testing.T) {
 		CIDR: enet,
 	}
 
-	sr, err := ParseAnnotations(defaults.Upstream{}, ing)
+	sr, err := ParseAnnotations(defaults.Backend{}, ing)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -87,14 +87,14 @@ func TestParseAnnotations(t *testing.T) {
 
 	data[whitelist] = "www"
 	ing.SetAnnotations(data)
-	_, err = ParseAnnotations(defaults.Upstream{}, ing)
+	_, err = ParseAnnotations(defaults.Backend{}, ing)
 	if err == nil {
 		t.Errorf("Expected error parsing an invalid cidr")
 	}
 
 	delete(data, "whitelist")
 	ing.SetAnnotations(data)
-	sr, _ = ParseAnnotations(defaults.Upstream{}, ing)
+	sr, _ = ParseAnnotations(defaults.Backend{}, ing)
 	// TODO: fix test
 	/*
 		if !reflect.DeepEqual(sr.CIDR, []string{}) {

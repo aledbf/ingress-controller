@@ -44,14 +44,14 @@ type Redirect struct {
 
 // ParseAnnotations parses the annotations contained in the ingress
 // rule used to rewrite the defined paths
-func ParseAnnotations(cfg defaults.Upstream, ing *extensions.Ingress) (*Redirect, error) {
+func ParseAnnotations(cfg defaults.Backend, ing *extensions.Ingress) (*Redirect, error) {
 	if ing.GetAnnotations() == nil {
 		return &Redirect{}, errors.New("no annotations present")
 	}
 
 	sslRe, err := parser.GetBoolAnnotation(sslRedirect, ing)
 	if err != nil {
-		sslRe = cfg.Secure
+		sslRe = cfg.SSLRedirect
 	}
 
 	rt, _ := parser.GetStringAnnotation(rewriteTo, ing)

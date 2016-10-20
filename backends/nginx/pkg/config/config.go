@@ -75,14 +75,11 @@ var (
 
 // Configuration represents the content of nginx.conf file
 type Configuration struct {
-	defaults.Backend `structs:",squash"`
+	defaults.Backend
 
 	// http://nginx.org/en/docs/http/ngx_http_core_module.html#client_max_body_size
 	// Sets the maximum allowed size of the client request body
 	BodySize string `structs:"body-size,omitempty"`
-
-	// HealthzURL defines the URL should be used in probes
-	HealthzURL string
 
 	// EnableDynamicTLSRecords enables dynamic TLS record sizes
 	// https://blog.cloudflare.com/optimizing-tls-over-tcp-to-reduce-latency
@@ -142,11 +139,6 @@ type Configuration struct {
 	// Default value depends on the processor’s cache line size.
 	// http://nginx.org/en/docs/http/ngx_http_map_module.html#map_hash_bucket_size
 	MapHashBucketSize int `structs:"map-hash-bucket-size,omitempty"`
-
-	// Defines a timeout for establishing a connection with a proxied server.
-	// It should be noted that this timeout cannot usually exceed 75 seconds.
-	// http://nginx.org/en/docs/http/ngx_http_proxy_module.html#proxy_connect_timeout
-	ProxyConnectTimeout int `structs:"proxy-connect-timeout,omitempty"`
 
 	// If UseProxyProtocol is enabled ProxyRealIPCIDR defines the default the IP/network address
 	// of your external load balancer
@@ -239,7 +231,6 @@ func NewDefault() Configuration {
 		KeepAlive:                75,
 		MaxWorkerConnections:     16384,
 		MapHashBucketSize:        64,
-		ProxyConnectTimeout:      5,
 		ProxyRealIPCIDR:          defIPCIDR,
 		ServerNameHashMaxSize:    512,
 		ServerNameHashBucketSize: 64,
@@ -256,6 +247,7 @@ func NewDefault() Configuration {
 		VtsStatusZoneSize:        "10m",
 		UseHTTP2:                 true,
 		Backend: defaults.Backend{
+			ProxyConnectTimeout:  5,
 			ProxyReadTimeout:     60,
 			ProxySendTimeout:     60,
 			ProxyBufferSize:      "4k",

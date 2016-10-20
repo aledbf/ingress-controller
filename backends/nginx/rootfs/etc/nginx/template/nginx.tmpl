@@ -1,13 +1,9 @@
-{{ $cfg := .cfg }}
+{{ $cfg := .cfg }}{{ $healthzURL := .healthzURL }}
 daemon off;
 
 worker_processes {{ $cfg.workerProcesses }};
-
 pid /run/nginx.pid;
-
 worker_rlimit_nofile 131072;
-
-pcre_jit on;
 
 events {
     multi_accept        on;
@@ -312,7 +308,7 @@ http {
         
         {{ if eq $server.Name "_" }}
         # health checks in cloud providers require the use of port 80
-        location {{ $cfg.HealthzURL }} {
+        location {{ $healthzURL }} {
             access_log off;
             return 200;
         }
@@ -338,7 +334,7 @@ http {
         # https://github.com/kubernetes/contrib/blob/master/ingress/controllers/nginx/nginx/command.go#L104
         listen 18080 default_server reuseport backlog={{ .backlogSize }};
 
-        location {{ $cfg.healthzUrl }} {
+        location {{ $healthzURL }} {
             access_log off;
             return 200;
         }

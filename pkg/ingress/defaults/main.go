@@ -1,22 +1,16 @@
 package defaults
 
-type Upstream struct {
-	Secure               bool
-	MaxFails             int
-	FailTimeout          int
-	ConnectTimeout       int
-	SendTimeout          int
-	ReadTimeout          int
-	BufferSize           string
-	WhitelistSourceRange []string
-}
-
 type Backend struct {
 	// enables which HTTP codes should be passed for processing with the error_page directive
 	// http://nginx.org/en/docs/http/ngx_http_proxy_module.html#proxy_intercept_errors
 	// http://nginx.org/en/docs/http/ngx_http_core_module.html#error_page
 	// By default this is disabled
 	CustomHTTPErrors []int `structs:"custom-http-errors,-"`
+
+	// Defines a timeout for establishing a connection with a proxied server.
+	// It should be noted that this timeout cannot usually exceed 75 seconds.
+	// http://nginx.org/en/docs/http/ngx_http_proxy_module.html#proxy_connect_timeout
+	ProxyConnectTimeout int `structs:"proxy-connect-timeout"`
 
 	// Timeout in seconds for reading a response from the proxied server. The timeout is set only between
 	// two successive read operations, not for the transmission of the whole response
