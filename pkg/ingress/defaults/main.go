@@ -59,5 +59,5 @@ type Backend struct {
 
 	// WhitelistSourceRange allows limiting access to certain client addresses
 	// http://nginx.org/en/docs/http/ngx_http_access_module.html
-	WhitelistSourceRange []string `structs:"whitelist-source-range,omitempty"`
+	WhitelistSourceRange []string `structs:"whitelist-source-range,-"`
 }
