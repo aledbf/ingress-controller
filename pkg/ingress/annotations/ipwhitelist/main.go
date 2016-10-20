@@ -46,7 +46,7 @@ type SourceRange struct {
 // rule used to limit access to certain client addresses or networks.
 // Multiple ranges can specified using commas as separator
 // e.g. `18.0.0.0/8,56.0.0.0/8`
-func ParseAnnotations(cfg defaults.Upstream, ing *extensions.Ingress) (*SourceRange, error) {
+func ParseAnnotations(cfg defaults.Backend, ing *extensions.Ingress) (*SourceRange, error) {
 	cidrs := []string{}
 
 	if ing.GetAnnotations() == nil {

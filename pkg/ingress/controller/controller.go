@@ -52,7 +52,6 @@ import (
 	"github.com/aledbf/ingress-controller/pkg/ingress/annotations/rewrite"
 	"github.com/aledbf/ingress-controller/pkg/ingress/annotations/secureupstream"
 	"github.com/aledbf/ingress-controller/pkg/ingress/annotations/service"
-	"github.com/aledbf/ingress-controller/pkg/ingress/defaults"
 	"github.com/aledbf/ingress-controller/pkg/ingress/status"
 	"github.com/aledbf/ingress-controller/pkg/k8s"
 	ssl "github.com/aledbf/ingress-controller/pkg/net/ssl"
@@ -127,9 +126,7 @@ type Configuration struct {
 	DefaultHealthzURL     string
 	PublishService        string
 
-	UpstreamDefaults defaults.Upstream
-
-	Backend ingress.IngressController
+	Backend ingress.Controller
 }
 
 // newIngressController creates an Ingress controller
@@ -358,13 +355,11 @@ func (ic *GenericController) sync(key interface{}) error {
 		}
 	}
 
-	//ngxConfig := ic.backend.ReadConfig(cfg)
-	//ngxConfig.HealthzURL = ic.cfg.DefaultHealthzURL
-
 	ings := ic.ingLister.Store.List()
 	upstreams, servers := ic.getUpstreamServers(ings)
 
-	err := ic.cfg.Backend.OnUpdate(cfg, ingress.Configuration{
+	data, err := ic.cfg.Backend.OnUpdate(cfg, ingress.Configuration{
+		HealthzURL:   ic.cfg.DefaultHealthzURL,
 		Upstreams:    upstreams,
 		Servers:      servers,
 		TCPUpstreams: ic.getTCPServices(),
@@ -374,12 +369,14 @@ func (ic *GenericController) sync(key interface{}) error {
 		return err
 	}
 
-	out, err := ic.cfg.Backend.Restart().CombinedOutput()
+	if !ic.cfg.Backend.IsReloadRequired(data) {
+		return nil
+	}
+	out, err := ic.cfg.Backend.Restart(data)
 	if err != nil {
 		glog.Errorf("unexpected failure restarting the backend: \n%v", string(out))
 		return err
 	}
-
 	return nil
 }
 
@@ -546,6 +543,8 @@ func (ic *GenericController) getUpstreamServers(data []interface{}) ([]*ingress.
 	upstreams := ic.createUpstreams(data)
 	servers := ic.createServers(data, upstreams)
 
+	upsDefaults := ic.cfg.Backend.UpstreamDefaults()
+
 	for _, ingIf := range data {
 		ing := ingIf.(*extensions.Ingress)
 
@@ -566,12 +565,12 @@ func (ic *GenericController) getUpstreamServers(data []interface{}) ([]*ingress.
 			glog.V(5).Infof("error reading secure upstream in Ingress %v/%v: %v", ing.GetNamespace(), ing.GetName(), err)
 		}
 
-		locRew, err := rewrite.ParseAnnotations(ic.cfg.UpstreamDefaults, ing)
+		locRew, err := rewrite.ParseAnnotations(upsDefaults, ing)
 		if err != nil {
 			glog.V(5).Infof("error parsing rewrite annotations for Ingress rule %v/%v: %v", ing.GetNamespace(), ing.GetName(), err)
 		}
 
-		wl, err := ipwhitelist.ParseAnnotations(ic.cfg.UpstreamDefaults, ing)
+		wl, err := ipwhitelist.ParseAnnotations(upsDefaults, ing)
 		glog.V(5).Infof("white list annotation: %v", wl)
 		if err != nil {
 			glog.V(5).Infof("error reading white list annotation in Ingress %v/%v: %v", ing.GetNamespace(), ing.GetName(), err)
@@ -588,7 +587,7 @@ func (ic *GenericController) getUpstreamServers(data []interface{}) ([]*ingress.
 			glog.V(5).Infof("error reading auth request annotation in Ingress %v/%v: %v", ing.GetNamespace(), ing.GetName(), err)
 		}
 
-		prx := proxy.ParseAnnotations(ic.cfg.UpstreamDefaults, ing)
+		prx := proxy.ParseAnnotations(upsDefaults, ing)
 		glog.V(5).Infof("proxy timeouts annotation: %v", prx)
 
 		certAuth, err := authtls.ParseAnnotations(ing, ic.getAuthCertificate)
@@ -732,10 +731,11 @@ func (ic *GenericController) createUpstreams(data []interface{}) map[string]*ing
 	upstreams := make(map[string]*ingress.Upstream)
 	upstreams[defUpstreamName] = ic.getDefaultUpstream()
 
+	upsDefaults := ic.cfg.Backend.UpstreamDefaults()
 	for _, ingIf := range data {
 		ing := ingIf.(*extensions.Ingress)
 
-		hz := healthcheck.ParseAnnotations(ic.cfg.UpstreamDefaults, ing)
+		hz := healthcheck.ParseAnnotations(upsDefaults, ing)
 
 		var defBackend string
 		if ing.Spec.Backend != nil {
@@ -830,7 +830,7 @@ func (ic *GenericController) createServers(data []interface{}, upstreams map[str
 		ngxCert, err = ic.getPemCertificate(ic.cfg.DefaultSSLCertificate)
 	}
 
-	ngxProxy := *proxy.ParseAnnotations(ic.cfg.UpstreamDefaults, nil)
+	ngxProxy := *proxy.ParseAnnotations(ic.cfg.Backend.UpstreamDefaults(), nil)
 
 	locs := []*ingress.Location{}
 	locs = append(locs, &ingress.Location{

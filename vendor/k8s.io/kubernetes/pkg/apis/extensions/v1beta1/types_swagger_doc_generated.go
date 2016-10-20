@@ -99,6 +99,7 @@ var map_DaemonSetStatus = map[string]string{
 	"currentNumberScheduled": "CurrentNumberScheduled is the number of nodes that are running at least 1 daemon pod and are supposed to run the daemon pod. More info: http://releases.k8s.io/HEAD/docs/admin/daemons.md",
 	"numberMisscheduled":     "NumberMisscheduled is the number of nodes that are running the daemon pod, but are not supposed to run the daemon pod. More info: http://releases.k8s.io/HEAD/docs/admin/daemons.md",
 	"desiredNumberScheduled": "DesiredNumberScheduled is the total number of nodes that should be running the daemon pod (including nodes correctly running the daemon pod). More info: http://releases.k8s.io/HEAD/docs/admin/daemons.md",
+	"numberReady":            "NumberReady is the number of nodes that should be running the daemon pod and have one or more of the daemon pod running and ready.",
 }
 
 func (DaemonSetStatus) SwaggerDoc() map[string]string {
@@ -552,6 +553,20 @@ func (ReplicaSet) SwaggerDoc() map[string]string {
 	return map_ReplicaSet
 }
 
+var map_ReplicaSetCondition = map[string]string{
+	"":                   "ReplicaSetCondition describes the state of a replica set at a certain point.",
+	"type":               "Type of replica set condition.",
+	"status":             "Status of the condition, one of True, False, Unknown.",
+	"lastProbeTime":      "Last time we probed the condition.",
+	"lastTransitionTime": "The last time the condition transitioned from one status to another.",
+	"reason":             "The reason for the condition's last transition.",
+	"message":            "A human readable message indicating details about the transition.",
+}
+
+func (ReplicaSetCondition) SwaggerDoc() map[string]string {
+	return map_ReplicaSetCondition
+}
+
 var map_ReplicaSetList = map[string]string{
 	"":         "ReplicaSetList is a collection of ReplicaSets.",
 	"metadata": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
@@ -581,6 +596,7 @@ var map_ReplicaSetStatus = map[string]string{
 	"readyReplicas":        "The number of ready replicas for this replica set.",
 	"availableReplicas":    "The number of available replicas (ready for at least minReadySeconds) for this replica set.",
 	"observedGeneration":   "ObservedGeneration reflects the generation of the most recently observed ReplicaSet.",
+	"conditions":           "Represents the latest available observations of a replica set's current state.",
 }
 
 func (ReplicaSetStatus) SwaggerDoc() map[string]string {

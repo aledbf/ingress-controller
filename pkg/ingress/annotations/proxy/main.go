@@ -40,34 +40,34 @@ type Configuration struct {
 
 // ParseAnnotations parses the annotations contained in the ingress
 // rule used to configure upstream check parameters
-func ParseAnnotations(cfg defaults.Upstream, ing *extensions.Ingress) *Configuration {
+func ParseAnnotations(cfg defaults.Backend, ing *extensions.Ingress) *Configuration {
 	if ing == nil || ing.GetAnnotations() == nil {
 		return &Configuration{
-			cfg.ConnectTimeout,
-			cfg.SendTimeout,
-			cfg.ReadTimeout,
-			cfg.BufferSize,
+			cfg.ProxyConnectTimeout,
+			cfg.ProxySendTimeout,
+			cfg.ProxyReadTimeout,
+			cfg.ProxyBufferSize,
 		}
 	}
 
 	ct, err := parser.GetIntAnnotation(connect, ing)
 	if err != nil {
-		ct = cfg.ConnectTimeout
+		ct = cfg.ProxyConnectTimeout
 	}
 
 	st, err := parser.GetIntAnnotation(send, ing)
 	if err != nil {
-		st = cfg.SendTimeout
+		st = cfg.ProxySendTimeout
 	}
 
 	rt, err := parser.GetIntAnnotation(read, ing)
 	if err != nil {
-		rt = cfg.ReadTimeout
+		rt = cfg.ProxyReadTimeout
 	}
 
 	bs, err := parser.GetStringAnnotation(bufferSize, ing)
 	if err != nil || bs == "" {
-		bs = cfg.BufferSize
+		bs = cfg.ProxyBufferSize
 	}
 
 	return &Configuration{ct, st, rt, bs}

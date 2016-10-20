@@ -68,7 +68,7 @@ func TestIngressHealthCheck(t *testing.T) {
 	data[upsMaxFails] = "2"
 	ing.SetAnnotations(data)
 
-	cfg := defaults.Upstream{FailTimeout: 1}
+	cfg := defaults.Backend{UpstreamFailTimeout: 1}
 
 	nginxHz := ParseAnnotations(cfg, ing)
 

@@ -71,7 +71,7 @@ func TestIngressHealthCheck(t *testing.T) {
 	data[bufferSize] = "1k"
 	ing.SetAnnotations(data)
 
-	cfg := defaults.Upstream{FailTimeout: 1}
+	cfg := defaults.Backend{UpstreamFailTimeout: 1}
 
 	p := ParseAnnotations(cfg, ing)
 

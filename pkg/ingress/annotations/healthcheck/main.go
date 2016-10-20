@@ -37,19 +37,19 @@ type Upstream struct {
 
 // ParseAnnotations parses the annotations contained in the ingress
 // rule used to configure upstream check parameters
-func ParseAnnotations(cfg defaults.Upstream, ing *extensions.Ingress) *Upstream {
+func ParseAnnotations(cfg defaults.Backend, ing *extensions.Ingress) *Upstream {
 	if ing.GetAnnotations() == nil {
-		return &Upstream{cfg.MaxFails, cfg.FailTimeout}
+		return &Upstream{cfg.UpstreamMaxFails, cfg.UpstreamFailTimeout}
 	}
 
 	mf, err := parser.GetIntAnnotation(upsMaxFails, ing)
 	if err != nil {
-		mf = cfg.MaxFails
+		mf = cfg.UpstreamMaxFails
 	}
 
 	ft, err := parser.GetIntAnnotation(upsFailTimeout, ing)
 	if err != nil {
-		ft = cfg.FailTimeout
+		ft = cfg.UpstreamFailTimeout
 	}
 
 	return &Upstream{mf, ft}
