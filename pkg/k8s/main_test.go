@@ -16,7 +16,12 @@ limitations under the License.
 
 package k8s
 
-import "testing"
+import (
+	"testing"
+
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
+)
 
 func TestParseNameNS(t *testing.T) {
 
@@ -47,5 +52,65 @@ func TestParseNameNS(t *testing.T) {
 		if test.name != name {
 			t.Errorf("%v: expected %v but retuned %v", test.title, test.name, name)
 		}
+	}
+}
+
+func TestIsValidService(t *testing.T) {
+	fk := testclient.NewSimpleFake(&api.Service{
+		ObjectMeta: api.ObjectMeta{
+			Namespace: api.NamespaceDefault,
+			Name:      "demo",
+		},
+	})
+
+	_, err := IsValidService(fk, "")
+	if err == nil {
+		t.Errorf("expected error but retuned nil")
+	}
+	s, err := IsValidService(fk, "default/demo")
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if s == nil {
+		t.Errorf("expected a Service but retuned nil")
+	}
+
+	fk = testclient.NewSimpleFake()
+	s, err = IsValidService(fk, "default/demo")
+	if err == nil {
+		t.Errorf("expected an error but retuned nil")
+	}
+	if s != nil {
+		t.Errorf("unexpected Service returned: %v", s)
+	}
+}
+
+func TestIsValidSecret(t *testing.T) {
+	fk := testclient.NewSimpleFake(&api.Secret{
+		ObjectMeta: api.ObjectMeta{
+			Namespace: api.NamespaceDefault,
+			Name:      "demo",
+		},
+	})
+
+	_, err := IsValidSecret(fk, "")
+	if err == nil {
+		t.Errorf("expected error but retuned nil")
+	}
+	s, err := IsValidSecret(fk, "default/demo")
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if s == nil {
+		t.Errorf("expected a Secret but retuned nil")
+	}
+
+	fk = testclient.NewSimpleFake()
+	s, err = IsValidSecret(fk, "default/demo")
+	if err == nil {
+		t.Errorf("expected an error but retuned nil")
+	}
+	if s != nil {
+		t.Errorf("unexpected Secret returned: %v", s)
 	}
 }
