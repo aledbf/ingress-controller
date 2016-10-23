@@ -26,11 +26,7 @@ import (
 )
 
 // IsValidService ...
-func IsValidService(kubeClient *unversioned.Client, nsName string) (*api.Service, error) {
-	if nsName == "" {
-		return nil, fmt.Errorf("empty string is not a valid service name")
-	}
-
+func IsValidService(kubeClient unversioned.Interface, nsName string) (*api.Service, error) {
 	ns, name, err := ParseNameNS(nsName)
 	if err != nil {
 		return nil, err
@@ -39,11 +35,7 @@ func IsValidService(kubeClient *unversioned.Client, nsName string) (*api.Service
 }
 
 // IsValidSecret ...
-func IsValidSecret(kubeClient *unversioned.Client, nsName string) (*api.Secret, error) {
-	if nsName == "" {
-		return nil, fmt.Errorf("empty string is not a valid service name")
-	}
-
+func IsValidSecret(kubeClient unversioned.Interface, nsName string) (*api.Secret, error) {
 	ns, name, err := ParseNameNS(nsName)
 	if err != nil {
 		return nil, err

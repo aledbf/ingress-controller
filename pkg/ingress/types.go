@@ -20,6 +20,7 @@ import (
 	"os/exec"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 
 	"github.com/aledbf/ingress-controller/pkg/ingress/annotations/auth"
 	"github.com/aledbf/ingress-controller/pkg/ingress/annotations/authreq"
@@ -180,6 +181,8 @@ func (c LocationByPath) Less(i, j int) bool {
 
 // SSLCert describes a SSL certificate to be used in a server
 type SSLCert struct {
+	api.ObjectMeta
+
 	CertFileName string
 	KeyFileName  string
 	CAFileName   string
@@ -192,3 +195,5 @@ type SSLCert struct {
 	// CN contains all the common names defined in the SSL certificate
 	CN []string
 }
+
+func (s SSLCert) GetObjectKind() unversioned.ObjectKind { return unversioned.EmptyObjectKind }

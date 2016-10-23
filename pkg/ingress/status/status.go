@@ -122,12 +122,7 @@ func (s *statusSync) run() {
 			return true, nil
 		}
 		// send a dummy object to the queue to force a sync
-		s.syncQueue.Enqueue(&dummyObject{
-			ObjectMeta: api.ObjectMeta{
-				Name:      "dummy",
-				Namespace: "default",
-			},
-		})
+		s.syncQueue.Enqueue("default/dummy")
 		return false, nil
 	})
 	if err != nil {
@@ -165,10 +160,6 @@ func (s *statusSync) callback(leader string) {
 	}
 }
 
-func objKeyFunc(obj interface{}) (interface{}, error) {
-	return obj, nil
-}
-
 // NewStatusSyncer returns a new Sync instance
 func NewStatusSyncer(config Config) Sync {
 	pod, err := k8s.GetPodDetails(config.Client)
@@ -179,8 +170,8 @@ func NewStatusSyncer(config Config) Sync {
 	st := statusSync{
 		pod:     pod,
 		runLock: &sync.Mutex{},
+		Config:  config,
 	}
-	st.Config = config
 	st.syncQueue = task.NewTaskQueue(st.sync)
 
 	le, err := NewElection("ingress-controller-leader",
@@ -232,7 +223,7 @@ func sliceToStatus(ips []string) []api.LoadBalancerIngress {
 		lbi = append(lbi, api.LoadBalancerIngress{IP: ip})
 	}
 
-	sort.Sort(LoadBalancerIngressByIP(lbi))
+	sort.Sort(loadBalancerIngressByIP(lbi))
 	return lbi
 }
 
@@ -252,7 +243,7 @@ func (s *statusSync) updateStatus(newIPs []api.LoadBalancerIngress) {
 			}
 
 			curIPs := ing.Status.LoadBalancer.Ingress
-			sort.Sort(LoadBalancerIngressByIP(curIPs))
+			sort.Sort(loadBalancerIngressByIP(curIPs))
 			if ingressSliceEqual(newIPs, curIPs) {
 				glog.V(3).Infof("skipping update of Ingress %v/%v (there is no change)", currIng.Namespace, currIng.Name)
 				return
@@ -276,28 +267,21 @@ func ingressSliceEqual(lhs, rhs []api.LoadBalancerIngress) bool {
 	}
 
 	for i := range lhs {
-		if !ingressEqual(&lhs[i], &rhs[i]) {
+		if lhs[i].IP != rhs[i].IP {
+			return false
+		}
+		if lhs[i].Hostname != rhs[i].Hostname {
 			return false
 		}
 	}
 	return true
 }
 
-func ingressEqual(lhs, rhs *api.LoadBalancerIngress) bool {
-	if lhs.IP != rhs.IP {
-		return false
-	}
-	if lhs.Hostname != rhs.Hostname {
-		return false
-	}
-	return true
-}
+// loadBalancerIngressByIP sorts LoadBalancerIngress using the field IP
+type loadBalancerIngressByIP []api.LoadBalancerIngress
 
-// LoadBalancerIngressByIP sorts LoadBalancerIngress using the field IP
-type LoadBalancerIngressByIP []api.LoadBalancerIngress
-
-func (c LoadBalancerIngressByIP) Len() int      { return len(c) }
-func (c LoadBalancerIngressByIP) Swap(i, j int) { c[i], c[j] = c[j], c[i] }
-func (c LoadBalancerIngressByIP) Less(i, j int) bool {
+func (c loadBalancerIngressByIP) Len() int      { return len(c) }
+func (c loadBalancerIngressByIP) Swap(i, j int) { c[i], c[j] = c[j], c[i] }
+func (c loadBalancerIngressByIP) Less(i, j int) bool {
 	return c[i].IP < c[j].IP
 }
