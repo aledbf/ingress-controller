@@ -1,5 +1,8 @@
 package defaults
 
+// Backend defines the mandatory configuration that an Ingress controller must provide
+// The reason of this requirements is the annotations are generic. If some implementation do not supports
+// one or more annotations it just can provides defaults
 type Backend struct {
 	// enables which HTTP codes should be passed for processing with the error_page directive
 	// http://nginx.org/en/docs/http/ngx_http_proxy_module.html#proxy_intercept_errors
