@@ -32,3 +32,7 @@ type StoreToSecretsLister struct {
 type StoreToConfigmapLister struct {
 	cache.Store
 }
+
+type StoreToSSLCertLister struct {
+	cache.Store
+}
