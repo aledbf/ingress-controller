@@ -33,38 +33,38 @@ import (
 )
 
 // AddOrUpdateCertAndKey creates a .pem file wth the cert and the key with the specified name
-func AddOrUpdateCertAndKey(name string, cert string, key string, ca string) (ingress.SSLCert, error) {
+func AddOrUpdateCertAndKey(name string, cert string, key string, ca string) (*ingress.SSLCert, error) {
 	pemName := fmt.Sprintf("%v.pem", name)
 	pemFileName := fmt.Sprintf("%v/%v", ingress.DefaultSSLDirectory, pemName)
 
 	tempPemFile, err := ioutil.TempFile("", pemName)
 	if err != nil {
-		return ingress.SSLCert{}, fmt.Errorf("Couldn't create temp pem file %v: %v", tempPemFile.Name(), err)
+		return nil, fmt.Errorf("Couldn't create temp pem file %v: %v", tempPemFile.Name(), err)
 	}
 
 	_, err = tempPemFile.WriteString(fmt.Sprintf("%v\n%v", cert, key))
 	if err != nil {
-		return ingress.SSLCert{}, fmt.Errorf("Couldn't write to pem file %v: %v", tempPemFile.Name(), err)
+		return nil, fmt.Errorf("Couldn't write to pem file %v: %v", tempPemFile.Name(), err)
 	}
 
 	err = tempPemFile.Close()
 	if err != nil {
-		return ingress.SSLCert{}, fmt.Errorf("Couldn't close temp pem file %v: %v", tempPemFile.Name(), err)
+		return nil, fmt.Errorf("Couldn't close temp pem file %v: %v", tempPemFile.Name(), err)
 	}
 
 	pemCerts, err := ioutil.ReadFile(tempPemFile.Name())
 	if err != nil {
-		return ingress.SSLCert{}, err
+		return nil, err
 	}
 
 	pembBock, _ := pem.Decode(pemCerts)
 	if pembBock == nil {
-		return ingress.SSLCert{}, fmt.Errorf("No valid PEM formatted block found")
+		return nil, fmt.Errorf("No valid PEM formatted block found")
 	}
 
 	pemCert, err := x509.ParseCertificate(pembBock.Bytes)
 	if err != nil {
-		return ingress.SSLCert{}, err
+		return nil, err
 	}
 
 	cn := []string{pemCert.Subject.CommonName}
@@ -78,12 +78,12 @@ func AddOrUpdateCertAndKey(name string, cert string, key string, ca string) (ing
 			log.Fatalf("client: loadkeys: %s", err)
 		}
 		if len(cck.Certificate) != 2 {
-			return ingress.SSLCert{}, fmt.Errorf("should have 2 concatenated certificates: cert and key")
+			return nil, fmt.Errorf("should have 2 concatenated certificates: cert and key")
 		}
 
 		caCert, err := ioutil.ReadFile(ca)
 		if err != nil {
-			return ingress.SSLCert{}, err
+			return nil, err
 		}
 
 		caCertPool := x509.NewCertPool()
@@ -98,16 +98,16 @@ func AddOrUpdateCertAndKey(name string, cert string, key string, ca string) (ing
 
 	if err != nil {
 		os.Remove(tempPemFile.Name())
-		return ingress.SSLCert{}, err
+		return nil, err
 	}
 
 	err = os.Rename(tempPemFile.Name(), pemFileName)
 	if err != nil {
 		os.Remove(tempPemFile.Name())
-		return ingress.SSLCert{}, fmt.Errorf("Couldn't move temp pem file %v to destination %v: %v", tempPemFile.Name(), pemFileName, err)
+		return nil, fmt.Errorf("Couldn't move temp pem file %v to destination %v: %v", tempPemFile.Name(), pemFileName, err)
 	}
 
-	return ingress.SSLCert{
+	return &ingress.SSLCert{
 		CertFileName: cert,
 		KeyFileName:  key,
 		PemFileName:  pemFileName,

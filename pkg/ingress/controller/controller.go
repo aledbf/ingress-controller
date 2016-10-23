@@ -55,7 +55,6 @@ import (
 	"github.com/aledbf/ingress-controller/pkg/ingress/annotations/service"
 	"github.com/aledbf/ingress-controller/pkg/ingress/status"
 	"github.com/aledbf/ingress-controller/pkg/k8s"
-	ssl "github.com/aledbf/ingress-controller/pkg/net/ssl"
 	"github.com/aledbf/ingress-controller/pkg/task"
 )
 
@@ -827,30 +826,6 @@ func (ic *GenericController) getSvcEndpoints(svcKey, backendPort string,
 
 func (ic *GenericController) createServers(data []interface{}, upstreams map[string]*ingress.Upstream) map[string]*ingress.Server {
 	servers := make(map[string]*ingress.Server)
-
-	pems := ic.getPemsFromIngress(data)
-
-	var ngxCert ingress.SSLCert
-	var err error
-
-	if ic.cfg.DefaultSSLCertificate == "" {
-		// use system certificated generated at image build time
-		cert, key := ssl.GetFakeSSLCert()
-		ngxCert, err = ssl.AddOrUpdateCertAndKey("system-snake-oil-certificate", cert, key, "")
-	} else {
-		ngxCert, err = ic.getPemCertificate(ic.cfg.DefaultSSLCertificate)
-	}
-
-	if err == nil {
-		pems[defServerName] = ngxCert
-		servers[defServerName].SSL = true
-		servers[defServerName].SSLCertificate = ngxCert.PemFileName
-		servers[defServerName].SSLCertificateKey = ngxCert.PemFileName
-		servers[defServerName].SSLPemChecksum = ngxCert.PemSHA
-	} else {
-		glog.Warningf("unexpected error reading default SSL certificate: %v", err)
-	}
-
 	ngxProxy := *proxy.ParseAnnotations(ic.cfg.Backend.UpstreamDefaults(), nil)
 
 	locs := []*ingress.Location{}
@@ -897,12 +872,14 @@ func (ic *GenericController) createServers(data []interface{}, upstreams map[str
 				servers[host] = &ingress.Server{Name: host, Locations: locs}
 			}
 
-			if ngxCert, ok := pems[host]; ok {
+			bc, exists, _ := ic.secretLister.GetByKey(host)
+			if exists {
+				cert := bc.(*ingress.SSLCert)
 				server := servers[host]
 				server.SSL = true
-				server.SSLCertificate = ngxCert.PemFileName
-				server.SSLCertificateKey = ngxCert.PemFileName
-				server.SSLPemChecksum = ngxCert.PemSHA
+				server.SSLCertificate = cert.PemFileName
+				server.SSLCertificateKey = cert.PemFileName
+				server.SSLPemChecksum = cert.PemSHA
 			}
 		}
 	}
