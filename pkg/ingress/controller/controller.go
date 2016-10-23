@@ -97,9 +97,16 @@ type GenericController struct {
 	secrLister cache_store.StoreToSecretsLister
 	mapLister  cache_store.StoreToConfigmapLister
 
+	// controller for NGINX SSL certificates
+	secretController *cache.Controller
+	secretLister     cache_store.StoreToSSLCertLister
+
 	recorder record.EventRecorder
 
 	syncQueue *task.Queue
+	// TaskQueue in charge of keep the secrets referenced from Ingress
+	// in sync with the files on disk
+	secretQueue *task.Queue
 
 	syncStatus status.Sync
 
@@ -184,26 +191,14 @@ func newIngressController(config *Configuration) IController {
 
 	secrEventHandler := cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
-			addSecr := obj.(*api.Secret)
-			if ic.secrReferenced(addSecr.Namespace, addSecr.Name) {
-				ic.recorder.Eventf(addSecr, api.EventTypeNormal, "CREATE", fmt.Sprintf("Secret %s/%s", addSecr.Namespace, addSecr.Name))
-				ic.syncQueue.Enqueue(obj)
-			}
+			ic.secretQueue.Enqueue(obj)
 		},
 		DeleteFunc: func(obj interface{}) {
-			delSecr := obj.(*api.Secret)
-			if ic.secrReferenced(delSecr.Namespace, delSecr.Name) {
-				ic.recorder.Eventf(delSecr, api.EventTypeNormal, "DELETE", fmt.Sprintf("Secret %s/%s", delSecr.Namespace, delSecr.Name))
-				ic.syncQueue.Enqueue(obj)
-			}
+			ic.secretQueue.Enqueue(obj)
 		},
 		UpdateFunc: func(old, cur interface{}) {
 			if !reflect.DeepEqual(old, cur) {
-				upSecr := cur.(*api.Secret)
-				if ic.secrReferenced(upSecr.Namespace, upSecr.Name) {
-					ic.recorder.Eventf(upSecr, api.EventTypeNormal, "UPDATE", fmt.Sprintf("Secret %s/%s", upSecr.Namespace, upSecr.Name))
-					ic.syncQueue.Enqueue(cur)
-				}
+				ic.secretQueue.Enqueue(cur)
 			}
 		},
 	}
@@ -294,13 +289,23 @@ func newIngressController(config *Configuration) IController {
 		},
 		&api.ConfigMap{}, ic.cfg.ResyncPeriod, mapEventHandler)
 
+	ic.secretLister.Store, ic.secretController = cache.NewInformer(
+		&cache.ListWatch{},
+		&ingress.SSLCert{},
+		ic.cfg.ResyncPeriod,
+		cache.ResourceEventHandlerFuncs{},
+	)
+
 	ic.syncStatus = status.NewStatusSyncer(status.Config{
 		Client:         config.Client,
 		ElectionClient: ic.cfg.ElectionClient,
 		PublishService: ic.cfg.PublishService,
 		IngressLister:  ic.ingLister,
 	})
+
 	ic.syncQueue = task.NewTaskQueue(ic.sync)
+
+	ic.secretQueue = task.NewTaskQueue(ic.syncSecret)
 
 	return ic
 }
@@ -836,6 +841,16 @@ func (ic *GenericController) createServers(data []interface{}, upstreams map[str
 		ngxCert, err = ic.getPemCertificate(ic.cfg.DefaultSSLCertificate)
 	}
 
+	if err == nil {
+		pems[defServerName] = ngxCert
+		servers[defServerName].SSL = true
+		servers[defServerName].SSLCertificate = ngxCert.PemFileName
+		servers[defServerName].SSLCertificateKey = ngxCert.PemFileName
+		servers[defServerName].SSLPemChecksum = ngxCert.PemSHA
+	} else {
+		glog.Warningf("unexpected error reading default SSL certificate: %v", err)
+	}
+
 	ngxProxy := *proxy.ParseAnnotations(ic.cfg.Backend.UpstreamDefaults(), nil)
 
 	locs := []*ingress.Location{}
@@ -846,16 +861,6 @@ func (ic *GenericController) createServers(data []interface{}, upstreams map[str
 		Proxy:        ngxProxy,
 	})
 	servers[defServerName] = &ingress.Server{Name: defServerName, Locations: locs}
-
-	if err == nil {
-		pems[defServerName] = ngxCert
-		servers[defServerName].SSL = true
-		servers[defServerName].SSLCertificate = ngxCert.PemFileName
-		servers[defServerName].SSLCertificateKey = ngxCert.PemFileName
-		servers[defServerName].SSLPemChecksum = ngxCert.PemSHA
-	} else {
-		glog.Warningf("unexpected error reading default SSL certificate: %v", err)
-	}
 
 	for _, ingIf := range data {
 		ing := ingIf.(*extensions.Ingress)
@@ -903,80 +908,6 @@ func (ic *GenericController) createServers(data []interface{}, upstreams map[str
 	}
 
 	return servers
-}
-
-func (ic *GenericController) getPemsFromIngress(data []interface{}) map[string]ingress.SSLCert {
-	pems := make(map[string]ingress.SSLCert)
-
-	for _, ingIf := range data {
-		ing := ingIf.(*extensions.Ingress)
-		for _, tls := range ing.Spec.TLS {
-			secretName := tls.SecretName
-			if secretName == "" {
-				glog.Errorf("No secretName defined for hosts")
-				continue
-			}
-
-			secretKey := fmt.Sprintf("%s/%s", ing.Namespace, secretName)
-
-			ngxCert, err := ic.getPemCertificate(secretKey)
-			if err != nil {
-				glog.Warningf("%v", err)
-				continue
-			}
-
-			for _, host := range tls.Hosts {
-				if isHostValid(host, ngxCert.CN) {
-					pems[host] = ngxCert
-				} else {
-					glog.Warningf("SSL Certificate stored in secret %v is not valid for the host %v defined in the Ingress rule %v", secretName, host, ing.Name)
-				}
-			}
-		}
-	}
-
-	return pems
-}
-
-func (ic *GenericController) getPemCertificate(secretName string) (ingress.SSLCert, error) {
-	secretInterface, exists, err := ic.secrLister.Store.GetByKey(secretName)
-	if err != nil {
-		return ingress.SSLCert{}, fmt.Errorf("Error retriveing secret %v: %v", secretName, err)
-	}
-	if !exists {
-		return ingress.SSLCert{}, fmt.Errorf("secret named %v does not exists", secretName)
-	}
-
-	secret := secretInterface.(*api.Secret)
-	cert, ok := secret.Data[api.TLSCertKey]
-	if !ok {
-		return ingress.SSLCert{}, fmt.Errorf("secret named %v has no private key", secretName)
-	}
-	key, ok := secret.Data[api.TLSPrivateKeyKey]
-	if !ok {
-		return ingress.SSLCert{}, fmt.Errorf("secret named %v has no cert", secretName)
-	}
-
-	ca := secret.Data["ca.crt"]
-
-	nsSecName := strings.Replace(secretName, "/", "-", -1)
-	return ssl.AddOrUpdateCertAndKey(nsSecName, string(cert), string(key), string(ca))
-}
-
-// check if secret is referenced in this controller's config
-func (ic *GenericController) secrReferenced(namespace string, name string) bool {
-	for _, ingIf := range ic.ingLister.Store.List() {
-		ing := ingIf.(*extensions.Ingress)
-		if ing.Namespace != namespace {
-			continue
-		}
-		for _, tls := range ing.Spec.TLS {
-			if tls.SecretName == name {
-				return true
-			}
-		}
-	}
-	return false
 }
 
 // getEndpoints returns a list of <endpoint ip>:<port> for a given service/target port combination.
@@ -1077,6 +1008,7 @@ func (ic GenericController) Start() {
 	go ic.mapController.Run(ic.stopCh)
 
 	go ic.syncQueue.Run(time.Second, ic.stopCh)
+	go ic.secretQueue.Run(time.Second, ic.stopCh)
 
 	go ic.syncStatus.Run(ic.stopCh)
 

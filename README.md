@@ -17,4 +17,4 @@ See [Ingress controller documentation](https://github.com/kubernetes/contrib/blo
   - on shutdown remove status IP
   - finish [first implementation](https://github.com/aledbf/ingress-controller/tree/master/backends/nginx) (nginx)
   - add ingress uuid (allow to group multiple controller in the same namespace - this is required to update the status IP in the leader)
-  
+  - secrReferenced
