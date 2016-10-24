@@ -17,8 +17,6 @@ limitations under the License.
 package controller
 
 import (
-	"strings"
-
 	"github.com/aledbf/ingress-controller/pkg/ingress"
 	"github.com/aledbf/ingress-controller/pkg/ingress/annotations/parser"
 
@@ -38,6 +36,7 @@ func newUpstream(name string) *ingress.Upstream {
 	}
 }
 
+/*
 func isHostValid(host string, cns []string) bool {
 	for _, cn := range cns {
 		if matchHostnames(cn, host) {
@@ -74,7 +73,7 @@ func matchHostnames(pattern, host string) bool {
 
 	return true
 }
-
+*/
 func isDefaultUpstream(ups *ingress.Upstream) bool {
 	if ups == nil || len(ups.Backends) == 0 {
 		return false

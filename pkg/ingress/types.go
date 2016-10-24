@@ -125,6 +125,7 @@ type Server struct {
 	SSLCertificate    string
 	SSLCertificateKey string
 	SSLPemChecksum    string
+	SSPassthrough     bool
 }
 
 // Location describes a server location
@@ -196,4 +197,5 @@ type SSLCert struct {
 	CN []string
 }
 
+// GetObjectKind implements the ObjectKind interface as a noop
 func (s SSLCert) GetObjectKind() unversioned.ObjectKind { return unversioned.EmptyObjectKind }

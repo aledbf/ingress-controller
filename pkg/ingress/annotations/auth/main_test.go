@@ -25,8 +25,6 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
 	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
@@ -65,30 +63,18 @@ func buildIngress() *extensions.Ingress {
 	}
 }
 
-type secretsClient struct {
-	unversioned.Interface
-}
-
-// dummySecret generates a secret with one user inside the auth key
-// foo:md5(bar)
-func dummySecret() *api.Secret {
+func mockSecret(name string) (*api.Secret, error) {
 	return &api.Secret{
 		ObjectMeta: api.ObjectMeta{
 			Namespace: api.NamespaceDefault,
 			Name:      "demo-secret",
 		},
 		Data: map[string][]byte{"auth": []byte("foo:$apr1$OFG3Xybp$ckL0FHDAkoXYIlH9.cysT0")},
-	}
+	}, nil
 }
-
-func mockClient() *testclient.Fake {
-	return testclient.NewSimpleFake(dummySecret())
-}
-
 func TestIngressWithoutAuth(t *testing.T) {
 	ing := buildIngress()
-	client := mockClient()
-	_, err := ParseAnnotations(client, ing, "")
+	_, err := ParseAnnotations(ing, "", mockSecret)
 	if err == nil {
 		t.Error("Expected error with ingress without annotations")
 	}
@@ -106,8 +92,7 @@ func TestIngressAuth(t *testing.T) {
 	_, dir, _ := dummySecretContent(t)
 	defer os.RemoveAll(dir)
 
-	client := mockClient()
-	auth, err := ParseAnnotations(client, ing, dir)
+	auth, err := ParseAnnotations(ing, dir, mockSecret)
 	if err != nil {
 		t.Errorf("Uxpected error with ingress: %v", err)
 	}
@@ -134,9 +119,7 @@ func dummySecretContent(t *testing.T) (string, string, *api.Secret) {
 		t.Error(err)
 	}
 	defer tmpfile.Close()
-
-	s := dummySecret()
-
+	s, _ := mockSecret("demo")
 	return tmpfile.Name(), dir, s
 }
 

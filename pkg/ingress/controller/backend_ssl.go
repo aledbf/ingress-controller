@@ -21,8 +21,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang/glog"
-
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 
@@ -32,9 +30,8 @@ import (
 
 // syncSecret keeps in sync Secrets used by Ingress rules with files to allow
 // being used in controllers.
-func (ic *GenericController) syncSecret(key interface{}) error {
+func (ic *GenericController) syncSecret(k interface{}) error {
 	ic.syncRateLimiter.Accept()
-
 	if ic.secretQueue.IsShuttingDown() {
 		return nil
 	}
@@ -43,7 +40,35 @@ func (ic *GenericController) syncSecret(key interface{}) error {
 		return fmt.Errorf("deferring sync till endpoints controller has synced")
 	}
 
-	secObj, exists, err := ic.secrLister.Store.GetByKey(key.(string))
+	// check if the default certificate is configured
+	_, exists, err := ic.secretLister.Store.GetByKey(defServerName)
+	if err != nil {
+		return nil
+	}
+	var cert *ingress.SSLCert
+	if !exists {
+		if ic.cfg.DefaultSSLCertificate != "" {
+			cert, err = ic.getPemCertificate(ic.cfg.DefaultSSLCertificate)
+			if err != nil {
+				return err
+			}
+		} else {
+			defCert, defKey := ssl.GetFakeSSLCert()
+			cert, err = ssl.AddOrUpdateCertAndKey("system-snake-oil-certificate", defCert, defKey, "")
+			if err != nil {
+				return nil
+			}
+		}
+		err = ic.secretLister.Store.Add(&cert)
+		if err != nil {
+			return err
+		}
+	}
+
+	key := k.(string)
+
+	// get secret
+	secObj, exists, err := ic.secrLister.Store.GetByKey(key)
 	if err != nil {
 		return fmt.Errorf("error getting secret %v: %v", key, err)
 	}
@@ -55,58 +80,35 @@ func (ic *GenericController) syncSecret(key interface{}) error {
 		return nil
 	}
 
-	return nil
-}
-
-func (ic *GenericController) getPemsFromIngress(data []interface{}) map[string]ingress.SSLCert {
-	pems := make(map[string]ingress.SSLCert)
-
-	for _, ingIf := range data {
-		ing := ingIf.(*extensions.Ingress)
-		for _, tls := range ing.Spec.TLS {
-			secretName := tls.SecretName
-			if secretName == "" {
-				glog.Errorf("No secretName defined for hosts")
-				continue
-			}
-
-			secretKey := fmt.Sprintf("%s/%s", ing.Namespace, secretName)
-			ngxCert, err := ic.getPemCertificate(secretKey)
-			if err != nil {
-				glog.Warningf("%v", err)
-				continue
-			}
-
-			for _, host := range tls.Hosts {
-				if isHostValid(host, ngxCert.CN) {
-					pems[host] = ngxCert
-				} else {
-					glog.Warningf("SSL Certificate stored in secret %v is not valid for the host %v defined in the Ingress rule %v", secretName, host, ing.Name)
-				}
-			}
-		}
+	// create certificates and add or update the item in the store
+	_, exists, err = ic.secretLister.Store.GetByKey(key)
+	cert, err = ic.getPemCertificate(ic.cfg.DefaultSSLCertificate)
+	if err != nil {
+		return err
 	}
-
-	return pems
+	if exists {
+		return ic.secretLister.Store.Update(cert)
+	}
+	return ic.secretLister.Store.Add(cert)
 }
 
-func (ic *GenericController) getPemCertificate(secretName string) (ingress.SSLCert, error) {
+func (ic *GenericController) getPemCertificate(secretName string) (*ingress.SSLCert, error) {
 	secretInterface, exists, err := ic.secrLister.Store.GetByKey(secretName)
 	if err != nil {
-		return ingress.SSLCert{}, fmt.Errorf("Error retriveing secret %v: %v", secretName, err)
+		return nil, fmt.Errorf("Error retriveing secret %v: %v", secretName, err)
 	}
 	if !exists {
-		return ingress.SSLCert{}, fmt.Errorf("secret named %v does not exists", secretName)
+		return nil, fmt.Errorf("secret named %v does not exists", secretName)
 	}
 
 	secret := secretInterface.(*api.Secret)
 	cert, ok := secret.Data[api.TLSCertKey]
 	if !ok {
-		return ingress.SSLCert{}, fmt.Errorf("secret named %v has no private key", secretName)
+		return nil, fmt.Errorf("secret named %v has no private key", secretName)
 	}
 	key, ok := secret.Data[api.TLSPrivateKeyKey]
 	if !ok {
-		return ingress.SSLCert{}, fmt.Errorf("secret named %v has no cert", secretName)
+		return nil, fmt.Errorf("secret named %v has no cert", secretName)
 	}
 
 	ca := secret.Data["ca.crt"]
