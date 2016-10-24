@@ -32,7 +32,6 @@ import (
 	fed_clientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/events"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/apps"
@@ -40,17 +39,16 @@ import (
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/certificates"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/apis/storage"
-	storageutil "k8s.io/kubernetes/pkg/apis/storage/util"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
+	adapter "k8s.io/kubernetes/pkg/client/unversioned/adapters/internalclientset"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/pkg/fieldpath"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/types"
-	certutil "k8s.io/kubernetes/pkg/util/cert"
+	utilcertificates "k8s.io/kubernetes/pkg/util/certificates"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/sets"
 
@@ -90,7 +88,7 @@ func (e ErrNoDescriber) Error() string {
 	return fmt.Sprintf("no describer has been defined for %v", e.Types)
 }
 
-func describerMap(c clientset.Interface) map[unversioned.GroupKind]Describer {
+func describerMap(c *client.Client) map[unversioned.GroupKind]Describer {
 	m := map[unversioned.GroupKind]Describer{
 		api.Kind("Pod"):                   &PodDescriber{c},
 		api.Kind("ReplicationController"): &ReplicationControllerDescriber{c},
@@ -111,14 +109,13 @@ func describerMap(c clientset.Interface) map[unversioned.GroupKind]Describer {
 		extensions.Kind("NetworkPolicy"):               &NetworkPolicyDescriber{c},
 		autoscaling.Kind("HorizontalPodAutoscaler"):    &HorizontalPodAutoscalerDescriber{c},
 		extensions.Kind("DaemonSet"):                   &DaemonSetDescriber{c},
-		extensions.Kind("Deployment"):                  &DeploymentDescriber{c},
+		extensions.Kind("Deployment"):                  &DeploymentDescriber{adapter.FromUnversionedClient(c)},
 		extensions.Kind("Job"):                         &JobDescriber{c},
 		extensions.Kind("Ingress"):                     &IngressDescriber{c},
 		batch.Kind("Job"):                              &JobDescriber{c},
-		batch.Kind("ScheduledJob"):                     &ScheduledJobDescriber{c},
+		batch.Kind("ScheduledJob"):                     &ScheduledJobDescriber{adapter.FromUnversionedClient(c)},
 		apps.Kind("PetSet"):                            &PetSetDescriber{c},
 		certificates.Kind("CertificateSigningRequest"): &CertificateSigningRequestDescriber{c},
-		storage.Kind("StorageClass"):                   &StorageClassDescriber{c},
 	}
 
 	return m
@@ -137,7 +134,7 @@ func DescribableResources() []string {
 
 // Describer returns the default describe functions for each of the standard
 // Kubernetes types.
-func DescriberFor(kind unversioned.GroupKind, c clientset.Interface) (Describer, bool) {
+func DescriberFor(kind unversioned.GroupKind, c *client.Client) (Describer, bool) {
 	f, ok := describerMap(c)[kind]
 	return f, ok
 }
@@ -165,15 +162,15 @@ func init() {
 
 // NamespaceDescriber generates information about a namespace
 type NamespaceDescriber struct {
-	clientset.Interface
+	client.Interface
 }
 
 func (d *NamespaceDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
-	ns, err := d.Core().Namespaces().Get(name)
+	ns, err := d.Namespaces().Get(name)
 	if err != nil {
 		return "", err
 	}
-	resourceQuotaList, err := d.Core().ResourceQuotas(name).List(api.ListOptions{})
+	resourceQuotaList, err := d.ResourceQuotas(name).List(api.ListOptions{})
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// Server does not support resource quotas.
@@ -183,7 +180,7 @@ func (d *NamespaceDescriber) Describe(namespace, name string, describerSettings 
 			return "", err
 		}
 	}
-	limitRangeList, err := d.Core().LimitRanges(name).List(api.ListOptions{})
+	limitRangeList, err := d.LimitRanges(name).List(api.ListOptions{})
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// Server does not support limit ranges.
@@ -213,71 +210,6 @@ func describeNamespace(namespace *api.Namespace, resourceQuotaList *api.Resource
 	})
 }
 
-func describeLimitRangeSpec(spec api.LimitRangeSpec, prefix string, w io.Writer) {
-	for i := range spec.Limits {
-		item := spec.Limits[i]
-		maxResources := item.Max
-		minResources := item.Min
-		defaultLimitResources := item.Default
-		defaultRequestResources := item.DefaultRequest
-		ratio := item.MaxLimitRequestRatio
-
-		set := map[api.ResourceName]bool{}
-		for k := range maxResources {
-			set[k] = true
-		}
-		for k := range minResources {
-			set[k] = true
-		}
-		for k := range defaultLimitResources {
-			set[k] = true
-		}
-		for k := range defaultRequestResources {
-			set[k] = true
-		}
-		for k := range ratio {
-			set[k] = true
-		}
-
-		for k := range set {
-			// if no value is set, we output -
-			maxValue := "-"
-			minValue := "-"
-			defaultLimitValue := "-"
-			defaultRequestValue := "-"
-			ratioValue := "-"
-
-			maxQuantity, maxQuantityFound := maxResources[k]
-			if maxQuantityFound {
-				maxValue = maxQuantity.String()
-			}
-
-			minQuantity, minQuantityFound := minResources[k]
-			if minQuantityFound {
-				minValue = minQuantity.String()
-			}
-
-			defaultLimitQuantity, defaultLimitQuantityFound := defaultLimitResources[k]
-			if defaultLimitQuantityFound {
-				defaultLimitValue = defaultLimitQuantity.String()
-			}
-
-			defaultRequestQuantity, defaultRequestQuantityFound := defaultRequestResources[k]
-			if defaultRequestQuantityFound {
-				defaultRequestValue = defaultRequestQuantity.String()
-			}
-
-			ratioQuantity, ratioQuantityFound := ratio[k]
-			if ratioQuantityFound {
-				ratioValue = ratioQuantity.String()
-			}
-
-			msg := "%s%s\t%v\t%v\t%v\t%v\t%v\t%v\n"
-			fmt.Fprintf(w, msg, prefix, item.Type, k, minValue, maxValue, defaultRequestValue, defaultLimitValue, ratioValue)
-		}
-	}
-}
-
 // DescribeLimitRanges merges a set of limit range items into a single tabular description
 func DescribeLimitRanges(limitRanges *api.LimitRangeList, w io.Writer) {
 	if len(limitRanges.Items) == 0 {
@@ -287,7 +219,68 @@ func DescribeLimitRanges(limitRanges *api.LimitRangeList, w io.Writer) {
 	fmt.Fprintf(w, "Resource Limits\n Type\tResource\tMin\tMax\tDefault Request\tDefault Limit\tMax Limit/Request Ratio\n")
 	fmt.Fprintf(w, " ----\t--------\t---\t---\t---------------\t-------------\t-----------------------\n")
 	for _, limitRange := range limitRanges.Items {
-		describeLimitRangeSpec(limitRange.Spec, " ", w)
+		for i := range limitRange.Spec.Limits {
+			item := limitRange.Spec.Limits[i]
+			maxResources := item.Max
+			minResources := item.Min
+			defaultLimitResources := item.Default
+			defaultRequestResources := item.DefaultRequest
+			ratio := item.MaxLimitRequestRatio
+
+			set := map[api.ResourceName]bool{}
+			for k := range maxResources {
+				set[k] = true
+			}
+			for k := range minResources {
+				set[k] = true
+			}
+			for k := range defaultLimitResources {
+				set[k] = true
+			}
+			for k := range defaultRequestResources {
+				set[k] = true
+			}
+			for k := range ratio {
+				set[k] = true
+			}
+
+			for k := range set {
+				// if no value is set, we output -
+				maxValue := "-"
+				minValue := "-"
+				defaultLimitValue := "-"
+				defaultRequestValue := "-"
+				ratioValue := "-"
+
+				maxQuantity, maxQuantityFound := maxResources[k]
+				if maxQuantityFound {
+					maxValue = maxQuantity.String()
+				}
+
+				minQuantity, minQuantityFound := minResources[k]
+				if minQuantityFound {
+					minValue = minQuantity.String()
+				}
+
+				defaultLimitQuantity, defaultLimitQuantityFound := defaultLimitResources[k]
+				if defaultLimitQuantityFound {
+					defaultLimitValue = defaultLimitQuantity.String()
+				}
+
+				defaultRequestQuantity, defaultRequestQuantityFound := defaultRequestResources[k]
+				if defaultRequestQuantityFound {
+					defaultRequestValue = defaultRequestQuantity.String()
+				}
+
+				ratioQuantity, ratioQuantityFound := ratio[k]
+				if ratioQuantityFound {
+					ratioValue = ratioQuantity.String()
+				}
+
+				msg := " %s\t%v\t%v\t%v\t%v\t%v\t%v\n"
+				fmt.Fprintf(w, msg, item.Type, k, minValue, maxValue, defaultRequestValue, defaultLimitValue, ratioValue)
+			}
+		}
 	}
 }
 
@@ -336,11 +329,11 @@ func DescribeResourceQuotas(quotas *api.ResourceQuotaList, w io.Writer) {
 
 // LimitRangeDescriber generates information about a limit range
 type LimitRangeDescriber struct {
-	clientset.Interface
+	client.Interface
 }
 
 func (d *LimitRangeDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
-	lr := d.Core().LimitRanges(namespace)
+	lr := d.LimitRanges(namespace)
 
 	limitRange, err := lr.Get(name)
 	if err != nil {
@@ -355,18 +348,79 @@ func describeLimitRange(limitRange *api.LimitRange) (string, error) {
 		fmt.Fprintf(out, "Namespace:\t%s\n", limitRange.Namespace)
 		fmt.Fprintf(out, "Type\tResource\tMin\tMax\tDefault Request\tDefault Limit\tMax Limit/Request Ratio\n")
 		fmt.Fprintf(out, "----\t--------\t---\t---\t---------------\t-------------\t-----------------------\n")
-		describeLimitRangeSpec(limitRange.Spec, "", out)
+		for i := range limitRange.Spec.Limits {
+			item := limitRange.Spec.Limits[i]
+			maxResources := item.Max
+			minResources := item.Min
+			defaultLimitResources := item.Default
+			defaultRequestResources := item.DefaultRequest
+			ratio := item.MaxLimitRequestRatio
+
+			set := map[api.ResourceName]bool{}
+			for k := range maxResources {
+				set[k] = true
+			}
+			for k := range minResources {
+				set[k] = true
+			}
+			for k := range defaultLimitResources {
+				set[k] = true
+			}
+			for k := range defaultRequestResources {
+				set[k] = true
+			}
+			for k := range ratio {
+				set[k] = true
+			}
+
+			for k := range set {
+				// if no value is set, we output -
+				maxValue := "-"
+				minValue := "-"
+				defaultLimitValue := "-"
+				defaultRequestValue := "-"
+				ratioValue := "-"
+
+				maxQuantity, maxQuantityFound := maxResources[k]
+				if maxQuantityFound {
+					maxValue = maxQuantity.String()
+				}
+
+				minQuantity, minQuantityFound := minResources[k]
+				if minQuantityFound {
+					minValue = minQuantity.String()
+				}
+
+				defaultLimitQuantity, defaultLimitQuantityFound := defaultLimitResources[k]
+				if defaultLimitQuantityFound {
+					defaultLimitValue = defaultLimitQuantity.String()
+				}
+
+				defaultRequestQuantity, defaultRequestQuantityFound := defaultRequestResources[k]
+				if defaultRequestQuantityFound {
+					defaultRequestValue = defaultRequestQuantity.String()
+				}
+
+				ratioQuantity, ratioQuantityFound := ratio[k]
+				if ratioQuantityFound {
+					ratioValue = ratioQuantity.String()
+				}
+
+				msg := "%v\t%v\t%v\t%v\t%v\t%v\t%v\n"
+				fmt.Fprintf(out, msg, item.Type, k, minValue, maxValue, defaultRequestValue, defaultLimitValue, ratioValue)
+			}
+		}
 		return nil
 	})
 }
 
 // ResourceQuotaDescriber generates information about a resource quota
 type ResourceQuotaDescriber struct {
-	clientset.Interface
+	client.Interface
 }
 
 func (d *ResourceQuotaDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
-	rq := d.Core().ResourceQuotas(namespace)
+	rq := d.ResourceQuotas(namespace)
 
 	resourceQuota, err := rq.Get(name)
 	if err != nil {
@@ -431,14 +485,14 @@ func describeQuota(resourceQuota *api.ResourceQuota) (string, error) {
 // PodDescriber generates information about a pod and the replication controllers that
 // create it.
 type PodDescriber struct {
-	clientset.Interface
+	client.Interface
 }
 
 func (d *PodDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
-	pod, err := d.Core().Pods(namespace).Get(name)
+	pod, err := d.Pods(namespace).Get(name)
 	if err != nil {
 		if describerSettings.ShowEvents {
-			eventsInterface := d.Core().Events(namespace)
+			eventsInterface := d.Events(namespace)
 			selector := eventsInterface.GetFieldSelector(&name, &namespace, nil, nil)
 			options := api.ListOptions{FieldSelector: selector}
 			events, err2 := eventsInterface.List(options)
@@ -459,7 +513,7 @@ func (d *PodDescriber) Describe(namespace, name string, describerSettings Descri
 			glog.Errorf("Unable to construct reference to '%#v': %v", pod, err)
 		} else {
 			ref.Kind = ""
-			events, _ = d.Core().Events(namespace).Search(ref)
+			events, _ = d.Events(namespace).Search(ref)
 		}
 	}
 
@@ -567,10 +621,6 @@ func describeVolumes(volumes []api.Volume, out io.Writer, space string) {
 			printDownwardAPIVolumeSource(volume.VolumeSource.DownwardAPI, out)
 		case volume.VolumeSource.AzureDisk != nil:
 			printAzureDiskVolumeSource(volume.VolumeSource.AzureDisk, out)
-		case volume.VolumeSource.VsphereVolume != nil:
-			printVsphereVolumeSource(volume.VolumeSource.VsphereVolume, out)
-		case volume.VolumeSource.Cinder != nil:
-			printCinderVolumeSource(volume.VolumeSource.Cinder, out)
 		default:
 			fmt.Fprintf(out, "  <unknown>\n")
 		}
@@ -699,26 +749,12 @@ func printAzureDiskVolumeSource(d *api.AzureDiskVolumeSource, out io.Writer) {
 		d.DiskName, d.DataDiskURI, *d.FSType, *d.CachingMode, *d.ReadOnly)
 }
 
-func printVsphereVolumeSource(vsphere *api.VsphereVirtualDiskVolumeSource, out io.Writer) {
-	fmt.Fprintf(out, "    Type:\tvSphereVolume (a Persistent Disk resource in vSphere)\n"+
-		"    VolumePath:\t%v\n"+
-		"    FSType:\t%v\n",
-		vsphere.VolumePath, vsphere.FSType)
-}
-func printCinderVolumeSource(cinder *api.CinderVolumeSource, out io.Writer) {
-	fmt.Fprintf(out, "    Type:\tCinder (a Persistent Disk resource in OpenStack)\n"+
-		"    VolumeID:\t%v\n"+
-		"    FSType:\t%v\n"+
-		"    ReadOnly:\t%v\n",
-		cinder.VolumeID, cinder.FSType, cinder.ReadOnly)
-}
-
 type PersistentVolumeDescriber struct {
-	clientset.Interface
+	client.Interface
 }
 
 func (d *PersistentVolumeDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
-	c := d.Core().PersistentVolumes()
+	c := d.PersistentVolumes()
 
 	pv, err := c.Get(name)
 	if err != nil {
@@ -729,13 +765,12 @@ func (d *PersistentVolumeDescriber) Describe(namespace, name string, describerSe
 
 	var events *api.EventList
 	if describerSettings.ShowEvents {
-		events, _ = d.Core().Events(namespace).Search(pv)
+		events, _ = d.Events(namespace).Search(pv)
 	}
 
 	return tabbedString(func(out io.Writer) error {
 		fmt.Fprintf(out, "Name:\t%s\n", pv.Name)
 		printLabelsMultiline(out, "Labels", pv.Labels)
-		fmt.Fprintf(out, "StorageClass:\t%s\n", storageutil.GetStorageClassAnnotation(pv.ObjectMeta))
 		fmt.Fprintf(out, "Status:\t%s\n", pv.Status.Phase)
 		if pv.Spec.ClaimRef != nil {
 			fmt.Fprintf(out, "Claim:\t%s\n", pv.Spec.ClaimRef.Namespace+"/"+pv.Spec.ClaimRef.Name)
@@ -765,10 +800,6 @@ func (d *PersistentVolumeDescriber) Describe(namespace, name string, describerSe
 			printRBDVolumeSource(pv.Spec.RBD, out)
 		case pv.Spec.Quobyte != nil:
 			printQuobyteVolumeSource(pv.Spec.Quobyte, out)
-		case pv.Spec.VsphereVolume != nil:
-			printVsphereVolumeSource(pv.Spec.VsphereVolume, out)
-		case pv.Spec.Cinder != nil:
-			printCinderVolumeSource(pv.Spec.Cinder, out)
 		}
 
 		if events != nil {
@@ -780,11 +811,11 @@ func (d *PersistentVolumeDescriber) Describe(namespace, name string, describerSe
 }
 
 type PersistentVolumeClaimDescriber struct {
-	clientset.Interface
+	client.Interface
 }
 
 func (d *PersistentVolumeClaimDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
-	c := d.Core().PersistentVolumeClaims(namespace)
+	c := d.PersistentVolumeClaims(namespace)
 
 	pvc, err := c.Get(name)
 	if err != nil {
@@ -800,12 +831,11 @@ func (d *PersistentVolumeClaimDescriber) Describe(namespace, name string, descri
 		capacity = storage.String()
 	}
 
-	events, _ := d.Core().Events(namespace).Search(pvc)
+	events, _ := d.Events(namespace).Search(pvc)
 
 	return tabbedString(func(out io.Writer) error {
 		fmt.Fprintf(out, "Name:\t%s\n", pvc.Name)
 		fmt.Fprintf(out, "Namespace:\t%s\n", pvc.Namespace)
-		fmt.Fprintf(out, "StorageClass:\t%s\n", storageutil.GetStorageClassAnnotation(pvc.ObjectMeta))
 		fmt.Fprintf(out, "Status:\t%v\n", pvc.Status.Phase)
 		fmt.Fprintf(out, "Volume:\t%s\n", pvc.Spec.VolumeName)
 		printLabelsMultiline(out, "Labels", pvc.Labels)
@@ -1053,12 +1083,12 @@ func printBool(value bool) string {
 // ReplicationControllerDescriber generates information about a replication controller
 // and the pods it has created.
 type ReplicationControllerDescriber struct {
-	clientset.Interface
+	client.Interface
 }
 
 func (d *ReplicationControllerDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
-	rc := d.Core().ReplicationControllers(namespace)
-	pc := d.Core().Pods(namespace)
+	rc := d.ReplicationControllers(namespace)
+	pc := d.Pods(namespace)
 
 	controller, err := rc.Get(name)
 	if err != nil {
@@ -1072,7 +1102,7 @@ func (d *ReplicationControllerDescriber) Describe(namespace, name string, descri
 
 	var events *api.EventList
 	if describerSettings.ShowEvents {
-		events, _ = d.Core().Events(namespace).Search(controller)
+		events, _ = d.Events(namespace).Search(controller)
 	}
 
 	return describeReplicationController(controller, events, running, waiting, succeeded, failed)
@@ -1122,12 +1152,12 @@ func DescribePodTemplate(template *api.PodTemplateSpec, out io.Writer) {
 
 // ReplicaSetDescriber generates information about a ReplicaSet and the pods it has created.
 type ReplicaSetDescriber struct {
-	clientset.Interface
+	client.Interface
 }
 
 func (d *ReplicaSetDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
 	rsc := d.Extensions().ReplicaSets(namespace)
-	pc := d.Core().Pods(namespace)
+	pc := d.Pods(namespace)
 
 	rs, err := rsc.Get(name)
 	if err != nil {
@@ -1143,7 +1173,7 @@ func (d *ReplicaSetDescriber) Describe(namespace, name string, describerSettings
 
 	var events *api.EventList
 	if describerSettings.ShowEvents {
-		events, _ = d.Core().Events(namespace).Search(rs)
+		events, _ = d.Events(namespace).Search(rs)
 	}
 
 	return describeReplicaSet(rs, events, running, waiting, succeeded, failed, getPodErr)
@@ -1173,7 +1203,7 @@ func describeReplicaSet(rs *extensions.ReplicaSet, events *api.EventList, runnin
 
 // JobDescriber generates information about a job and the pods it has created.
 type JobDescriber struct {
-	clientset.Interface
+	client.Interface
 }
 
 func (d *JobDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
@@ -1184,7 +1214,7 @@ func (d *JobDescriber) Describe(namespace, name string, describerSettings Descri
 
 	var events *api.EventList
 	if describerSettings.ShowEvents {
-		events, _ = d.Core().Events(namespace).Search(job)
+		events, _ = d.Events(namespace).Search(job)
 	}
 
 	return describeJob(job, events)
@@ -1307,12 +1337,12 @@ func printActiveJobs(out io.Writer, title string, jobs []api.ObjectReference) {
 
 // DaemonSetDescriber generates information about a daemon set and the pods it has created.
 type DaemonSetDescriber struct {
-	clientset.Interface
+	client.Interface
 }
 
 func (d *DaemonSetDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
 	dc := d.Extensions().DaemonSets(namespace)
-	pc := d.Core().Pods(namespace)
+	pc := d.Pods(namespace)
 
 	daemon, err := dc.Get(name)
 	if err != nil {
@@ -1330,7 +1360,7 @@ func (d *DaemonSetDescriber) Describe(namespace, name string, describerSettings 
 
 	var events *api.EventList
 	if describerSettings.ShowEvents {
-		events, _ = d.Core().Events(namespace).Search(daemon)
+		events, _ = d.Events(namespace).Search(daemon)
 	}
 
 	return describeDaemonSet(daemon, events, running, waiting, succeeded, failed)
@@ -1361,11 +1391,11 @@ func describeDaemonSet(daemon *extensions.DaemonSet, events *api.EventList, runn
 
 // SecretDescriber generates information about a secret
 type SecretDescriber struct {
-	clientset.Interface
+	client.Interface
 }
 
 func (d *SecretDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
-	c := d.Core().Secrets(namespace)
+	c := d.Secrets(namespace)
 
 	secret, err := c.Get(name)
 	if err != nil {
@@ -1399,11 +1429,11 @@ func describeSecret(secret *api.Secret) (string, error) {
 }
 
 type IngressDescriber struct {
-	clientset.Interface
+	client.Interface
 }
 
 func (i *IngressDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
-	c := i.Extensions().Ingresses(namespace)
+	c := i.Extensions().Ingress(namespace)
 	ing, err := c.Get(name)
 	if err != nil {
 		return "", err
@@ -1412,8 +1442,8 @@ func (i *IngressDescriber) Describe(namespace, name string, describerSettings De
 }
 
 func (i *IngressDescriber) describeBackend(ns string, backend *extensions.IngressBackend) string {
-	endpoints, _ := i.Core().Endpoints(ns).Get(backend.ServiceName)
-	service, _ := i.Core().Services(ns).Get(backend.ServiceName)
+	endpoints, _ := i.Endpoints(ns).Get(backend.ServiceName)
+	service, _ := i.Services(ns).Get(backend.ServiceName)
 	spName := ""
 	for i := range service.Spec.Ports {
 		sp := &service.Spec.Ports[i]
@@ -1474,7 +1504,7 @@ func (i *IngressDescriber) describeIngress(ing *extensions.Ingress, describerSet
 		describeIngressAnnotations(out, ing.Annotations)
 
 		if describerSettings.ShowEvents {
-			events, _ := i.Core().Events(ing.Namespace).Search(ing)
+			events, _ := i.Events(ing.Namespace).Search(ing)
 			if events != nil {
 				DescribeEvents(events, out)
 			}
@@ -1511,21 +1541,21 @@ func describeIngressAnnotations(out io.Writer, annotations map[string]string) {
 
 // ServiceDescriber generates information about a service.
 type ServiceDescriber struct {
-	clientset.Interface
+	client.Interface
 }
 
 func (d *ServiceDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
-	c := d.Core().Services(namespace)
+	c := d.Services(namespace)
 
 	service, err := c.Get(name)
 	if err != nil {
 		return "", err
 	}
 
-	endpoints, _ := d.Core().Endpoints(namespace).Get(name)
+	endpoints, _ := d.Endpoints(namespace).Get(name)
 	var events *api.EventList
 	if describerSettings.ShowEvents {
-		events, _ = d.Core().Events(namespace).Search(service)
+		events, _ = d.Events(namespace).Search(service)
 	}
 	return describeService(service, endpoints, events)
 }
@@ -1590,11 +1620,11 @@ func describeService(service *api.Service, endpoints *api.Endpoints, events *api
 
 // EndpointsDescriber generates information about an Endpoint.
 type EndpointsDescriber struct {
-	clientset.Interface
+	client.Interface
 }
 
 func (d *EndpointsDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
-	c := d.Core().Endpoints(namespace)
+	c := d.Endpoints(namespace)
 
 	ep, err := c.Get(name)
 	if err != nil {
@@ -1603,7 +1633,7 @@ func (d *EndpointsDescriber) Describe(namespace, name string, describerSettings 
 
 	var events *api.EventList
 	if describerSettings.ShowEvents {
-		events, _ = d.Core().Events(namespace).Search(ep)
+		events, _ = d.Events(namespace).Search(ep)
 	}
 
 	return describeEndpoints(ep, events)
@@ -1663,11 +1693,11 @@ func describeEndpoints(ep *api.Endpoints, events *api.EventList) (string, error)
 
 // ServiceAccountDescriber generates information about a service.
 type ServiceAccountDescriber struct {
-	clientset.Interface
+	client.Interface
 }
 
 func (d *ServiceAccountDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
-	c := d.Core().ServiceAccounts(namespace)
+	c := d.ServiceAccounts(namespace)
 
 	serviceAccount, err := c.Get(name)
 	if err != nil {
@@ -1678,7 +1708,7 @@ func (d *ServiceAccountDescriber) Describe(namespace, name string, describerSett
 
 	tokenSelector := fields.SelectorFromSet(map[string]string{api.SecretTypeField: string(api.SecretTypeServiceAccountToken)})
 	options := api.ListOptions{FieldSelector: tokenSelector}
-	secrets, err := d.Core().Secrets(namespace).List(options)
+	secrets, err := d.Secrets(namespace).List(options)
 	if err == nil {
 		for _, s := range secrets.Items {
 			name, _ := s.Annotations[api.ServiceAccountNameKey]
@@ -1744,11 +1774,11 @@ func describeServiceAccount(serviceAccount *api.ServiceAccount, tokens []api.Sec
 
 // NodeDescriber generates information about a node.
 type NodeDescriber struct {
-	clientset.Interface
+	client.Interface
 }
 
 func (d *NodeDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
-	mc := d.Core().Nodes()
+	mc := d.Nodes()
 	node, err := mc.Get(name)
 	if err != nil {
 		return "", err
@@ -1761,7 +1791,7 @@ func (d *NodeDescriber) Describe(namespace, name string, describerSettings Descr
 	// in a policy aware setting, users may have access to a node, but not all pods
 	// in that case, we note that the user does not have access to the pods
 	canViewPods := true
-	nodeNonTerminatedPodsList, err := d.Core().Pods(namespace).List(api.ListOptions{FieldSelector: fieldSelector})
+	nodeNonTerminatedPodsList, err := d.Pods(namespace).List(api.ListOptions{FieldSelector: fieldSelector})
 	if err != nil {
 		if !errors.IsForbidden(err) {
 			return "", err
@@ -1776,7 +1806,7 @@ func (d *NodeDescriber) Describe(namespace, name string, describerSettings Descr
 		} else {
 			// TODO: We haven't decided the namespace for Node object yet.
 			ref.UID = types.UID(ref.Name)
-			events, _ = d.Core().Events("").Search(ref)
+			events, _ = d.Events("").Search(ref)
 		}
 	}
 
@@ -1863,7 +1893,7 @@ func describeNode(node *api.Node, nodeNonTerminatedPodsList *api.PodList, events
 }
 
 type PetSetDescriber struct {
-	client clientset.Interface
+	client *client.Client
 }
 
 func (p *PetSetDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
@@ -1871,7 +1901,7 @@ func (p *PetSetDescriber) Describe(namespace, name string, describerSettings Des
 	if err != nil {
 		return "", err
 	}
-	pc := p.client.Core().Pods(namespace)
+	pc := p.client.Pods(namespace)
 
 	selector, err := unversioned.LabelSelectorAsSelector(ps.Spec.Selector)
 	if err != nil {
@@ -1895,7 +1925,7 @@ func (p *PetSetDescriber) Describe(namespace, name string, describerSettings Des
 		fmt.Fprintf(out, "Pods Status:\t%d Running / %d Waiting / %d Succeeded / %d Failed\n", running, waiting, succeeded, failed)
 		describeVolumes(ps.Spec.Template.Spec.Volumes, out, "")
 		if describerSettings.ShowEvents {
-			events, _ := p.client.Core().Events(namespace).Search(ps)
+			events, _ := p.client.Events(namespace).Search(ps)
 			if events != nil {
 				DescribeEvents(events, out)
 			}
@@ -1905,7 +1935,7 @@ func (p *PetSetDescriber) Describe(namespace, name string, describerSettings Des
 }
 
 type CertificateSigningRequestDescriber struct {
-	client clientset.Interface
+	client *client.Client
 }
 
 func (p *CertificateSigningRequestDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
@@ -1914,7 +1944,7 @@ func (p *CertificateSigningRequestDescriber) Describe(namespace, name string, de
 		return "", err
 	}
 
-	cr, err := certutil.ParseCSR(csr)
+	cr, err := utilcertificates.ParseCertificateRequestObject(csr)
 	if err != nil {
 		return "", fmt.Errorf("Error parsing CSR: %v", err)
 	}
@@ -1963,7 +1993,7 @@ func (p *CertificateSigningRequestDescriber) Describe(namespace, name string, de
 		}
 
 		if describerSettings.ShowEvents {
-			events, _ := p.client.Core().Events(namespace).Search(csr)
+			events, _ := p.client.Events(namespace).Search(csr)
 			if events != nil {
 				DescribeEvents(events, out)
 			}
@@ -1974,7 +2004,7 @@ func (p *CertificateSigningRequestDescriber) Describe(namespace, name string, de
 
 // HorizontalPodAutoscalerDescriber generates information about a horizontal pod autoscaler.
 type HorizontalPodAutoscalerDescriber struct {
-	client clientset.Interface
+	client *client.Client
 }
 
 func (d *HorizontalPodAutoscalerDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
@@ -2010,7 +2040,7 @@ func (d *HorizontalPodAutoscalerDescriber) Describe(namespace, name string, desc
 		// TODO: switch to scale subresource once the required code is submitted.
 		if strings.ToLower(hpa.Spec.ScaleTargetRef.Kind) == "replicationcontroller" {
 			fmt.Fprintf(out, "ReplicationController pods:\t")
-			rc, err := d.client.Core().ReplicationControllers(hpa.Namespace).Get(hpa.Spec.ScaleTargetRef.Name)
+			rc, err := d.client.ReplicationControllers(hpa.Namespace).Get(hpa.Spec.ScaleTargetRef.Name)
 			if err == nil {
 				fmt.Fprintf(out, "%d current / %d desired\n", rc.Status.Replicas, rc.Spec.Replicas)
 			} else {
@@ -2019,7 +2049,7 @@ func (d *HorizontalPodAutoscalerDescriber) Describe(namespace, name string, desc
 		}
 
 		if describerSettings.ShowEvents {
-			events, _ := d.client.Core().Events(namespace).Search(hpa)
+			events, _ := d.client.Events(namespace).Search(hpa)
 			if events != nil {
 				DescribeEvents(events, out)
 			}
@@ -2112,11 +2142,11 @@ func getPodsTotalRequestsAndLimits(podList *api.PodList) (reqs map[api.ResourceN
 
 func DescribeEvents(el *api.EventList, w io.Writer) {
 	if len(el.Items) == 0 {
-		fmt.Fprint(w, "No events.\n")
+		fmt.Fprint(w, "No events.")
 		return
 	}
-	sort.Sort(events.SortableEvents(el.Items))
-	fmt.Fprint(w, "Events:\n  FirstSeen\tLastSeen\tCount\tFrom\tSubObjectPath\tType\tReason\tMessage\n")
+	sort.Sort(SortableEvents(el.Items))
+	fmt.Fprint(w, "Events:\n  FirstSeen\tLastSeen\tCount\tFrom\tSubobjectPath\tType\tReason\tMessage\n")
 	fmt.Fprint(w, "  ---------\t--------\t-----\t----\t-------------\t--------\t------\t-------\n")
 	for _, e := range el.Items {
 		fmt.Fprintf(w, "  %s\t%s\t%d\t%v\t%v\t%v\t%v\t%v\n",
@@ -2260,11 +2290,11 @@ func getPodStatusForController(c client.PodInterface, selector labels.Selector) 
 
 // ConfigMapDescriber generates information about a ConfigMap
 type ConfigMapDescriber struct {
-	clientset.Interface
+	client.Interface
 }
 
 func (d *ConfigMapDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
-	c := d.Core().ConfigMaps(namespace)
+	c := d.ConfigMaps(namespace)
 
 	configMap, err := c.Get(name)
 	if err != nil {
@@ -2332,7 +2362,7 @@ func describeCluster(cluster *federation.Cluster) (string, error) {
 
 // NetworkPolicyDescriber generates information about a NetworkPolicy
 type NetworkPolicyDescriber struct {
-	clientset.Interface
+	client.Interface
 }
 
 func (d *NetworkPolicyDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
@@ -2353,34 +2383,6 @@ func describeNetworkPolicy(networkPolicy *extensions.NetworkPolicy) (string, err
 		printLabelsMultiline(out, "Labels", networkPolicy.Labels)
 		printLabelsMultiline(out, "Annotations", networkPolicy.Annotations)
 
-		return nil
-	})
-}
-
-type StorageClassDescriber struct {
-	clientset.Interface
-}
-
-func (s *StorageClassDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
-	sc, err := s.Storage().StorageClasses().Get(name)
-	if err != nil {
-		return "", err
-	}
-	return tabbedString(func(out io.Writer) error {
-		fmt.Fprintf(out, "Name:\t%s\n", sc.Name)
-		fmt.Fprintf(out, "IsDefaultClass:\t%s\n", storageutil.IsDefaultAnnotationText(sc.ObjectMeta))
-		fmt.Fprintf(out, "Annotations:\t%s\n", labels.FormatLabels(sc.Annotations))
-		fmt.Fprintf(out, "Provisioner:\t%s\n", sc.Provisioner)
-		fmt.Fprintf(out, "Parameters:\t%s\n", labels.FormatLabels(sc.Parameters))
-		if describerSettings.ShowEvents {
-			events, err := s.Core().Events(namespace).Search(sc)
-			if err != nil {
-				return err
-			}
-			if events != nil {
-				DescribeEvents(events, out)
-			}
-		}
 		return nil
 	})
 }

@@ -162,7 +162,6 @@ func RegisterDeepCopies(scheme *runtime.Scheme) error {
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_RBDVolumeSource, InType: reflect.TypeOf(&RBDVolumeSource{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_RangeAllocation, InType: reflect.TypeOf(&RangeAllocation{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_ReplicationController, InType: reflect.TypeOf(&ReplicationController{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_ReplicationControllerCondition, InType: reflect.TypeOf(&ReplicationControllerCondition{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_ReplicationControllerList, InType: reflect.TypeOf(&ReplicationControllerList{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_ReplicationControllerSpec, InType: reflect.TypeOf(&ReplicationControllerSpec{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_ReplicationControllerStatus, InType: reflect.TypeOf(&ReplicationControllerStatus{})},
@@ -1179,7 +1178,6 @@ func DeepCopy_api_FlockerVolumeSource(in interface{}, out interface{}, c *conver
 		in := in.(*FlockerVolumeSource)
 		out := out.(*FlockerVolumeSource)
 		out.DatasetName = in.DatasetName
-		out.DatasetUUID = in.DatasetUUID
 		return nil
 	}
 }
@@ -2964,23 +2962,7 @@ func DeepCopy_api_ReplicationController(in interface{}, out interface{}, c *conv
 		if err := DeepCopy_api_ReplicationControllerSpec(&in.Spec, &out.Spec, c); err != nil {
 			return err
 		}
-		if err := DeepCopy_api_ReplicationControllerStatus(&in.Status, &out.Status, c); err != nil {
-			return err
-		}
-		return nil
-	}
-}
-
-func DeepCopy_api_ReplicationControllerCondition(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*ReplicationControllerCondition)
-		out := out.(*ReplicationControllerCondition)
-		out.Type = in.Type
 		out.Status = in.Status
-		out.LastProbeTime = in.LastProbeTime.DeepCopy()
-		out.LastTransitionTime = in.LastTransitionTime.DeepCopy()
-		out.Reason = in.Reason
-		out.Message = in.Message
 		return nil
 	}
 }
@@ -3011,7 +2993,6 @@ func DeepCopy_api_ReplicationControllerSpec(in interface{}, out interface{}, c *
 		in := in.(*ReplicationControllerSpec)
 		out := out.(*ReplicationControllerSpec)
 		out.Replicas = in.Replicas
-		out.MinReadySeconds = in.MinReadySeconds
 		if in.Selector != nil {
 			in, out := &in.Selector, &out.Selector
 			*out = make(map[string]string)
@@ -3041,19 +3022,7 @@ func DeepCopy_api_ReplicationControllerStatus(in interface{}, out interface{}, c
 		out.Replicas = in.Replicas
 		out.FullyLabeledReplicas = in.FullyLabeledReplicas
 		out.ReadyReplicas = in.ReadyReplicas
-		out.AvailableReplicas = in.AvailableReplicas
 		out.ObservedGeneration = in.ObservedGeneration
-		if in.Conditions != nil {
-			in, out := &in.Conditions, &out.Conditions
-			*out = make([]ReplicationControllerCondition, len(*in))
-			for i := range *in {
-				if err := DeepCopy_api_ReplicationControllerCondition(&(*in)[i], &(*out)[i], c); err != nil {
-					return err
-				}
-			}
-		} else {
-			out.Conditions = nil
-		}
 		return nil
 	}
 }

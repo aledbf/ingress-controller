@@ -855,12 +855,8 @@ func validateGlusterfs(glusterfs *api.GlusterfsVolumeSource, fldPath *field.Path
 
 func validateFlockerVolumeSource(flocker *api.FlockerVolumeSource, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if len(flocker.DatasetName) == 0 && len(flocker.DatasetUUID) == 0 {
-		//TODO: consider adding a RequiredOneOf() error for this and similar cases
-		allErrs = append(allErrs, field.Required(fldPath, "one of datasetName and datasetUUID is required"))
-	}
-	if len(flocker.DatasetName) != 0 && len(flocker.DatasetUUID) != 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath, "resource", "datasetName and datasetUUID can not be specified simultaneously"))
+	if len(flocker.DatasetName) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("datasetName"), ""))
 	}
 	if strings.Contains(flocker.DatasetName, "/") {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("datasetName"), flocker.DatasetName, "must not contain '/'"))
@@ -2119,7 +2115,7 @@ func ValidateTolerationsInPodAnnotations(annotations map[string]string, fldPath 
 	return allErrs
 }
 
-func ValidateSeccompProfile(p string, fldPath *field.Path) field.ErrorList {
+func validateSeccompProfile(p string, fldPath *field.Path) field.ErrorList {
 	if p == "docker/default" {
 		return nil
 	}
@@ -2135,11 +2131,11 @@ func ValidateSeccompProfile(p string, fldPath *field.Path) field.ErrorList {
 func ValidateSeccompPodAnnotations(annotations map[string]string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if p, exists := annotations[api.SeccompPodAnnotationKey]; exists {
-		allErrs = append(allErrs, ValidateSeccompProfile(p, fldPath.Child(api.SeccompPodAnnotationKey))...)
+		allErrs = append(allErrs, validateSeccompProfile(p, fldPath.Child(api.SeccompPodAnnotationKey))...)
 	}
 	for k, p := range annotations {
 		if strings.HasPrefix(k, api.SeccompContainerAnnotationKeyPrefix) {
-			allErrs = append(allErrs, ValidateSeccompProfile(p, fldPath.Child(k))...)
+			allErrs = append(allErrs, validateSeccompProfile(p, fldPath.Child(k))...)
 		}
 	}
 
@@ -2406,9 +2402,6 @@ func ValidateService(service *api.Service) field.ErrorList {
 				allErrs = append(allErrs, field.Invalid(portPath, port.Port, "may not expose port 10250 externally since it is used by kubelet"))
 			}
 		}
-		if service.Spec.ClusterIP == "None" {
-			allErrs = append(allErrs, field.Invalid(specPath.Child("clusterIP"), service.Spec.ClusterIP, "may not be set to 'None' for LoadBalancer services"))
-		}
 	case api.ServiceTypeExternalName:
 		if service.Spec.ClusterIP != "" {
 			allErrs = append(allErrs, field.Invalid(specPath.Child("clusterIP"), service.Spec.ClusterIP, "must be empty for ExternalName services"))
@@ -2609,8 +2602,6 @@ func ValidateReplicationControllerStatusUpdate(controller, oldController *api.Re
 	statusPath := field.NewPath("status")
 	allErrs = append(allErrs, ValidateNonnegativeField(int64(controller.Status.Replicas), statusPath.Child("replicas"))...)
 	allErrs = append(allErrs, ValidateNonnegativeField(int64(controller.Status.FullyLabeledReplicas), statusPath.Child("fullyLabeledReplicas"))...)
-	allErrs = append(allErrs, ValidateNonnegativeField(int64(controller.Status.ReadyReplicas), statusPath.Child("readyReplicas"))...)
-	allErrs = append(allErrs, ValidateNonnegativeField(int64(controller.Status.AvailableReplicas), statusPath.Child("availableReplicas"))...)
 	allErrs = append(allErrs, ValidateNonnegativeField(int64(controller.Status.ObservedGeneration), statusPath.Child("observedGeneration"))...)
 	return allErrs
 }
@@ -2654,7 +2645,6 @@ func ValidatePodTemplateSpecForRC(template *api.PodTemplateSpec, selectorMap map
 // ValidateReplicationControllerSpec tests if required fields in the replication controller spec are set.
 func ValidateReplicationControllerSpec(spec *api.ReplicationControllerSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	allErrs = append(allErrs, ValidateNonnegativeField(int64(spec.MinReadySeconds), fldPath.Child("minReadySeconds"))...)
 	allErrs = append(allErrs, ValidateNonEmptySelector(spec.Selector, fldPath.Child("selector"))...)
 	allErrs = append(allErrs, ValidateNonnegativeField(int64(spec.Replicas), fldPath.Child("replicas"))...)
 	allErrs = append(allErrs, ValidatePodTemplateSpecForRC(spec.Template, spec.Selector, spec.Replicas, fldPath.Child("template"))...)
@@ -2939,17 +2929,6 @@ func ValidateLimitRange(limitRange *api.LimitRange) field.ErrorList {
 				allErrs = append(allErrs, validateLimitRangeResourceName(limit.Type, string(k), idxPath.Child("defaultRequest").Key(string(k)))...)
 				keys.Insert(string(k))
 				defaultRequests[string(k)] = q
-			}
-		}
-
-		if limit.Type == api.LimitTypePersistentVolumeClaim {
-			_, minQuantityFound := limit.Min[api.ResourceStorage]
-			_, maxQuantityFound := limit.Max[api.ResourceStorage]
-			if !minQuantityFound {
-				allErrs = append(allErrs, field.Required(idxPath.Child("min"), "minimum storage value is required"))
-			}
-			if !maxQuantityFound {
-				allErrs = append(allErrs, field.Required(idxPath.Child("max"), "maximum storage value is required"))
 			}
 		}
 

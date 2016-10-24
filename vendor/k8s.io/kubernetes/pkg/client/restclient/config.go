@@ -25,7 +25,6 @@ import (
 	"path"
 	gruntime "runtime"
 	"strings"
-	"time"
 
 	"github.com/golang/glog"
 
@@ -33,7 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 	"k8s.io/kubernetes/pkg/runtime"
-	certutil "k8s.io/kubernetes/pkg/util/cert"
+	"k8s.io/kubernetes/pkg/util/crypto"
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/version"
 )
@@ -109,9 +108,6 @@ type Config struct {
 
 	// Rate limiter for limiting connections to the master from this client. If present overwrites QPS/Burst
 	RateLimiter flowcontrol.RateLimiter
-
-	// The maximum length of time to wait before giving up on a server request. A value of zero means no timeout.
-	Timeout time.Duration
 
 	// Version forces a specific version to be used (if registered)
 	// Do we need this?
@@ -189,9 +185,6 @@ func RESTClientFor(config *Config) (*RESTClient, error) {
 	var httpClient *http.Client
 	if transport != http.DefaultTransport {
 		httpClient = &http.Client{Transport: transport}
-		if config.Timeout > 0 {
-			httpClient.Timeout = config.Timeout
-		}
 	}
 
 	return NewRESTClient(baseURL, versionedAPIPath, config.ContentConfig, qps, burst, config.RateLimiter, httpClient)
@@ -217,9 +210,6 @@ func UnversionedRESTClientFor(config *Config) (*RESTClient, error) {
 	var httpClient *http.Client
 	if transport != http.DefaultTransport {
 		httpClient = &http.Client{Transport: transport}
-		if config.Timeout > 0 {
-			httpClient.Timeout = config.Timeout
-		}
 	}
 
 	versionConfig := config.ContentConfig
@@ -271,7 +261,7 @@ func InClusterConfig() (*Config, error) {
 	}
 	tlsClientConfig := TLSClientConfig{}
 	rootCAFile := "/var/run/secrets/kubernetes.io/serviceaccount/" + api.ServiceAccountRootCAKey
-	if _, err := certutil.NewPool(rootCAFile); err != nil {
+	if _, err := crypto.CertPoolFromFile(rootCAFile); err != nil {
 		glog.Errorf("Expected to load root CA config from %s, but got err: %v", rootCAFile, err)
 	} else {
 		tlsClientConfig.CAFile = rootCAFile
@@ -342,27 +332,4 @@ func AddUserAgent(config *Config, userAgent string) *Config {
 	fullUserAgent := DefaultKubernetesUserAgent() + "/" + userAgent
 	config.UserAgent = fullUserAgent
 	return config
-}
-
-// AnonymousClientConfig returns a copy of the given config with all user credentials (cert/key, bearer token, and username/password) removed
-func AnonymousClientConfig(config *Config) *Config {
-	// copy only known safe fields
-	return &Config{
-		Host:          config.Host,
-		APIPath:       config.APIPath,
-		Prefix:        config.Prefix,
-		ContentConfig: config.ContentConfig,
-		TLSClientConfig: TLSClientConfig{
-			CAFile: config.TLSClientConfig.CAFile,
-			CAData: config.TLSClientConfig.CAData,
-		},
-		RateLimiter:   config.RateLimiter,
-		Insecure:      config.Insecure,
-		UserAgent:     config.UserAgent,
-		Transport:     config.Transport,
-		WrapTransport: config.WrapTransport,
-		QPS:           config.QPS,
-		Burst:         config.Burst,
-		Timeout:       config.Timeout,
-	}
 }

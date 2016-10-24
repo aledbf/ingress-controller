@@ -24,7 +24,6 @@ import (
 
 type CoreInterface interface {
 	GetRESTClient() *restclient.RESTClient
-	ConfigMapsGetter
 	EventsGetter
 	NamespacesGetter
 	SecretsGetter
@@ -34,10 +33,6 @@ type CoreInterface interface {
 // CoreClient is used to interact with features provided by the Core group.
 type CoreClient struct {
 	*restclient.RESTClient
-}
-
-func (c *CoreClient) ConfigMaps(namespace string) ConfigMapInterface {
-	return newConfigMaps(c, namespace)
 }
 
 func (c *CoreClient) Events(namespace string) EventInterface {
@@ -94,10 +89,12 @@ func setConfigDefaults(config *restclient.Config) error {
 	if config.UserAgent == "" {
 		config.UserAgent = restclient.DefaultKubernetesUserAgent()
 	}
-	if config.GroupVersion == nil || config.GroupVersion.Group != g.GroupVersion.Group {
-		copyGroupVersion := g.GroupVersion
-		config.GroupVersion = &copyGroupVersion
-	}
+	// TODO: Unconditionally set the config.Version, until we fix the config.
+	//if config.Version == "" {
+	copyGroupVersion := g.GroupVersion
+	config.GroupVersion = &copyGroupVersion
+	//}
+
 	config.NegotiatedSerializer = api.Codecs
 
 	if config.QPS == 0 {

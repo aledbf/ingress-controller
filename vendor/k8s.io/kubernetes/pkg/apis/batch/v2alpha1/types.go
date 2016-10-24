@@ -25,18 +25,15 @@ import (
 type Job struct {
 	unversioned.TypeMeta `json:",inline"`
 	// Standard object's metadata.
-	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
-	// +optional
+	// More info: http://releases.k8s.io/release-1.4/docs/devel/api-conventions.md#metadata
 	v1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// Spec is a structure defining the expected behavior of a job.
-	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
-	// +optional
+	// More info: http://releases.k8s.io/release-1.4/docs/devel/api-conventions.md#spec-and-status
 	Spec JobSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 
 	// Status is a structure describing current status of a job.
-	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
-	// +optional
+	// More info: http://releases.k8s.io/release-1.4/docs/devel/api-conventions.md#spec-and-status
 	Status JobStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
 }
 
@@ -44,8 +41,7 @@ type Job struct {
 type JobList struct {
 	unversioned.TypeMeta `json:",inline"`
 	// Standard list metadata
-	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
-	// +optional
+	// More info: http://releases.k8s.io/release-1.4/docs/devel/api-conventions.md#metadata
 	unversioned.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// Items is the list of Job.
@@ -56,26 +52,22 @@ type JobList struct {
 type JobTemplate struct {
 	unversioned.TypeMeta `json:",inline"`
 	// Standard object's metadata.
-	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
-	// +optional
+	// More info: http://releases.k8s.io/release-1.4/docs/devel/api-conventions.md#metadata
 	v1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// Template defines jobs that will be created from this template
-	// http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
-	// +optional
+	// http://releases.k8s.io/release-1.4/docs/devel/api-conventions.md#spec-and-status
 	Template JobTemplateSpec `json:"template,omitempty" protobuf:"bytes,2,opt,name=template"`
 }
 
 // JobTemplateSpec describes the data a Job should have when created from a template
 type JobTemplateSpec struct {
 	// Standard object's metadata of the jobs created from this template.
-	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
-	// +optional
+	// More info: http://releases.k8s.io/release-1.4/docs/devel/api-conventions.md#metadata
 	v1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// Specification of the desired behavior of the job.
-	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
-	// +optional
+	// More info: http://releases.k8s.io/release-1.4/docs/devel/api-conventions.md#spec-and-status
 	Spec JobSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 }
 
@@ -86,8 +78,7 @@ type JobSpec struct {
 	// run at any given time. The actual number of pods running in steady state will
 	// be less than this number when ((.spec.completions - .status.successful) < .spec.parallelism),
 	// i.e. when the work left to do is less than max parallelism.
-	// More info: http://kubernetes.io/docs/user-guide/jobs
-	// +optional
+	// More info: http://releases.k8s.io/release-1.4/docs/user-guide/jobs.md
 	Parallelism *int32 `json:"parallelism,omitempty" protobuf:"varint,1,opt,name=parallelism"`
 
 	// Completions specifies the desired number of successfully finished pods the
@@ -95,19 +86,16 @@ type JobSpec struct {
 	// pod signals the success of all pods, and allows parallelism to have any positive
 	// value.  Setting to 1 means that parallelism is limited to 1 and the success of that
 	// pod signals the success of the job.
-	// More info: http://kubernetes.io/docs/user-guide/jobs
-	// +optional
+	// More info: http://releases.k8s.io/release-1.4/docs/user-guide/jobs.md
 	Completions *int32 `json:"completions,omitempty" protobuf:"varint,2,opt,name=completions"`
 
 	// Optional duration in seconds relative to the startTime that the job may be active
 	// before the system tries to terminate it; value must be positive integer
-	// +optional
 	ActiveDeadlineSeconds *int64 `json:"activeDeadlineSeconds,omitempty" protobuf:"varint,3,opt,name=activeDeadlineSeconds"`
 
 	// Selector is a label query over pods that should match the pod count.
 	// Normally, the system sets this field for you.
-	// More info: http://kubernetes.io/docs/user-guide/labels#label-selectors
-	// +optional
+	// More info: http://releases.k8s.io/release-1.4/docs/user-guide/labels.md#label-selectors
 	Selector *LabelSelector `json:"selector,omitempty" protobuf:"bytes,4,opt,name=selector"`
 
 	// ManualSelector controls generation of pod labels and pod selectors.
@@ -119,13 +107,12 @@ type JobSpec struct {
 	// and other jobs to not function correctly.  However, You may see
 	// `manualSelector=true` in jobs that were created with the old `extensions/v1beta1`
 	// API.
-	// More info: http://releases.k8s.io/HEAD/docs/design/selector-generation.md
-	// +optional
+	// More info: http://releases.k8s.io/release-1.4/docs/design/selector-generation.md
 	ManualSelector *bool `json:"manualSelector,omitempty" protobuf:"varint,5,opt,name=manualSelector"`
 
 	// Template is the object that describes the pod that will be created when
 	// executing a job.
-	// More info: http://kubernetes.io/docs/user-guide/jobs
+	// More info: http://releases.k8s.io/release-1.4/docs/user-guide/jobs.md
 	Template v1.PodTemplateSpec `json:"template" protobuf:"bytes,6,opt,name=template"`
 }
 
@@ -133,32 +120,26 @@ type JobSpec struct {
 type JobStatus struct {
 
 	// Conditions represent the latest available observations of an object's current state.
-	// More info: http://kubernetes.io/docs/user-guide/jobs
-	// +optional
+	// More info: http://releases.k8s.io/release-1.4/docs/user-guide/jobs.md
 	Conditions []JobCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
 
 	// StartTime represents time when the job was acknowledged by the Job Manager.
 	// It is not guaranteed to be set in happens-before order across separate operations.
 	// It is represented in RFC3339 form and is in UTC.
-	// +optional
 	StartTime *unversioned.Time `json:"startTime,omitempty" protobuf:"bytes,2,opt,name=startTime"`
 
 	// CompletionTime represents time when the job was completed. It is not guaranteed to
 	// be set in happens-before order across separate operations.
 	// It is represented in RFC3339 form and is in UTC.
-	// +optional
 	CompletionTime *unversioned.Time `json:"completionTime,omitempty" protobuf:"bytes,3,opt,name=completionTime"`
 
 	// Active is the number of actively running pods.
-	// +optional
 	Active int32 `json:"active,omitempty" protobuf:"varint,4,opt,name=active"`
 
 	// Succeeded is the number of pods which reached Phase Succeeded.
-	// +optional
 	Succeeded int32 `json:"succeeded,omitempty" protobuf:"varint,5,opt,name=succeeded"`
 
 	// Failed is the number of pods which reached Phase Failed.
-	// +optional
 	Failed int32 `json:"failed,omitempty" protobuf:"varint,6,opt,name=failed"`
 }
 
@@ -179,16 +160,12 @@ type JobCondition struct {
 	// Status of the condition, one of True, False, Unknown.
 	Status v1.ConditionStatus `json:"status" protobuf:"bytes,2,opt,name=status,casttype=k8s.io/kubernetes/pkg/api/v1.ConditionStatus"`
 	// Last time the condition was checked.
-	// +optional
 	LastProbeTime unversioned.Time `json:"lastProbeTime,omitempty" protobuf:"bytes,3,opt,name=lastProbeTime"`
 	// Last time the condition transit from one status to another.
-	// +optional
 	LastTransitionTime unversioned.Time `json:"lastTransitionTime,omitempty" protobuf:"bytes,4,opt,name=lastTransitionTime"`
 	// (brief) reason for the condition's last transition.
-	// +optional
 	Reason string `json:"reason,omitempty" protobuf:"bytes,5,opt,name=reason"`
 	// Human readable message indicating details about last transition.
-	// +optional
 	Message string `json:"message,omitempty" protobuf:"bytes,6,opt,name=message"`
 }
 
@@ -196,18 +173,15 @@ type JobCondition struct {
 type ScheduledJob struct {
 	unversioned.TypeMeta `json:",inline"`
 	// Standard object's metadata.
-	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
-	// +optional
+	// More info: http://releases.k8s.io/release-1.4/docs/devel/api-conventions.md#metadata
 	v1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// Spec is a structure defining the expected behavior of a job, including the schedule.
-	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
-	// +optional
+	// More info: http://releases.k8s.io/release-1.4/docs/devel/api-conventions.md#spec-and-status
 	Spec ScheduledJobSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 
 	// Status is a structure describing current status of a job.
-	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
-	// +optional
+	// More info: http://releases.k8s.io/release-1.4/docs/devel/api-conventions.md#spec-and-status
 	Status ScheduledJobStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
 }
 
@@ -215,8 +189,7 @@ type ScheduledJob struct {
 type ScheduledJobList struct {
 	unversioned.TypeMeta `json:",inline"`
 	// Standard list metadata
-	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
-	// +optional
+	// More info: http://releases.k8s.io/release-1.4/docs/devel/api-conventions.md#metadata
 	unversioned.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// Items is the list of ScheduledJob.
@@ -231,16 +204,13 @@ type ScheduledJobSpec struct {
 
 	// Optional deadline in seconds for starting the job if it misses scheduled
 	// time for any reason.  Missed jobs executions will be counted as failed ones.
-	// +optional
 	StartingDeadlineSeconds *int64 `json:"startingDeadlineSeconds,omitempty" protobuf:"varint,2,opt,name=startingDeadlineSeconds"`
 
 	// ConcurrencyPolicy specifies how to treat concurrent executions of a Job.
-	// +optional
 	ConcurrencyPolicy ConcurrencyPolicy `json:"concurrencyPolicy,omitempty" protobuf:"bytes,3,opt,name=concurrencyPolicy,casttype=ConcurrencyPolicy"`
 
 	// Suspend flag tells the controller to suspend subsequent executions, it does
 	// not apply to already started executions.  Defaults to false.
-	// +optional
 	Suspend *bool `json:"suspend,omitempty" protobuf:"varint,4,opt,name=suspend"`
 
 	// JobTemplate is the object that describes the job that will be created when
@@ -269,11 +239,9 @@ const (
 // ScheduledJobStatus represents the current state of a Job.
 type ScheduledJobStatus struct {
 	// Active holds pointers to currently running jobs.
-	// +optional
 	Active []v1.ObjectReference `json:"active,omitempty" protobuf:"bytes,1,rep,name=active"`
 
 	// LastScheduleTime keeps information of when was the last time the job was successfully scheduled.
-	// +optional
 	LastScheduleTime *unversioned.Time `json:"lastScheduleTime,omitempty" protobuf:"bytes,4,opt,name=lastScheduleTime"`
 }
 
@@ -284,10 +252,8 @@ type LabelSelector struct {
 	// matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
 	// map is equivalent to an element of matchExpressions, whose key field is "key", the
 	// operator is "In", and the values array contains only "value". The requirements are ANDed.
-	// +optional
 	MatchLabels map[string]string `json:"matchLabels,omitempty" protobuf:"bytes,1,rep,name=matchLabels"`
 	// matchExpressions is a list of label selector requirements. The requirements are ANDed.
-	// +optional
 	MatchExpressions []LabelSelectorRequirement `json:"matchExpressions,omitempty" protobuf:"bytes,2,rep,name=matchExpressions"`
 }
 
@@ -303,7 +269,6 @@ type LabelSelectorRequirement struct {
 	// the values array must be non-empty. If the operator is Exists or DoesNotExist,
 	// the values array must be empty. This array is replaced during a strategic
 	// merge patch.
-	// +optional
 	Values []string `json:"values,omitempty" protobuf:"bytes,3,rep,name=values"`
 }
 

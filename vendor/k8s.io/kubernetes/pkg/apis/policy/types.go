@@ -24,16 +24,12 @@ import (
 
 // PodDisruptionBudgetSpec is a description of a PodDisruptionBudget.
 type PodDisruptionBudgetSpec struct {
-	// An eviction is allowed if at least "minAvailable" pods selected by
-	// "selector" will still be available after the eviction, i.e. even in the
-	// absence of the evicted pod.  So for example you can prevent all voluntary
-	// evictions by specifying "100%".
-	// +optional
+	// The minimum number of pods that must be available simultaneously.  This
+	// can be either an integer or a string specifying a percentage, e.g. "28%".
 	MinAvailable intstr.IntOrString `json:"minAvailable,omitempty"`
 
 	// Label query over pods whose evictions are managed by the disruption
 	// budget.
-	// +optional
 	Selector *unversioned.LabelSelector `json:"selector,omitempty"`
 }
 
@@ -54,25 +50,22 @@ type PodDisruptionBudgetStatus struct {
 }
 
 // +genclient=true
+// +noMethods=true
 
 // PodDisruptionBudget is an object to define the max disruption that can be caused to a collection of pods
 type PodDisruptionBudget struct {
 	unversioned.TypeMeta `json:",inline"`
-	// +optional
-	api.ObjectMeta `json:"metadata,omitempty"`
+	api.ObjectMeta       `json:"metadata,omitempty"`
 
 	// Specification of the desired behavior of the PodDisruptionBudget.
-	// +optional
 	Spec PodDisruptionBudgetSpec `json:"spec,omitempty"`
 	// Most recently observed status of the PodDisruptionBudget.
-	// +optional
 	Status PodDisruptionBudgetStatus `json:"status,omitempty"`
 }
 
 // PodDisruptionBudgetList is a collection of PodDisruptionBudgets.
 type PodDisruptionBudgetList struct {
 	unversioned.TypeMeta `json:",inline"`
-	// +optional
 	unversioned.ListMeta `json:"metadata,omitempty"`
 	Items                []PodDisruptionBudget `json:"items"`
 }
@@ -84,10 +77,8 @@ type Eviction struct {
 	unversioned.TypeMeta `json:",inline"`
 
 	// ObjectMeta describes the pod that is being evicted.
-	// +optional
 	api.ObjectMeta `json:"metadata,omitempty"`
 
 	// DeleteOptions may be provided
-	// +optional
 	DeleteOptions *api.DeleteOptions `json:"deleteOptions,omitempty"`
 }

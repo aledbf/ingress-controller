@@ -68,12 +68,11 @@ func NewSharedInformer(lw ListerWatcher, objType runtime.Object, resyncPeriod ti
 // be shared amongst all consumers.
 func NewSharedIndexInformer(lw ListerWatcher, objType runtime.Object, resyncPeriod time.Duration, indexers Indexers) SharedIndexInformer {
 	sharedIndexInformer := &sharedIndexInformer{
-		processor:             &sharedProcessor{},
-		indexer:               NewIndexer(DeletionHandlingMetaNamespaceKeyFunc, indexers),
-		listerWatcher:         lw,
-		objectType:            objType,
-		fullResyncPeriod:      resyncPeriod,
-		cacheMutationDetector: NewCacheMutationDetector(fmt.Sprintf("%T", objType)),
+		processor:        &sharedProcessor{},
+		indexer:          NewIndexer(DeletionHandlingMetaNamespaceKeyFunc, indexers),
+		listerWatcher:    lw,
+		objectType:       objType,
+		fullResyncPeriod: resyncPeriod,
 	}
 	return sharedIndexInformer
 }
@@ -110,8 +109,7 @@ type sharedIndexInformer struct {
 	indexer    Indexer
 	controller *Controller
 
-	processor             *sharedProcessor
-	cacheMutationDetector CacheMutationDetector
+	processor *sharedProcessor
 
 	// This block is tracked to handle late initialization of the controller
 	listerWatcher    ListerWatcher
@@ -182,7 +180,6 @@ func (s *sharedIndexInformer) Run(stopCh <-chan struct{}) {
 	}()
 
 	s.stopCh = stopCh
-	s.cacheMutationDetector.Run(stopCh)
 	s.processor.run(stopCh)
 	s.controller.Run(stopCh)
 }
@@ -276,7 +273,6 @@ func (s *sharedIndexInformer) HandleDeltas(obj interface{}) error {
 	for _, d := range obj.(Deltas) {
 		switch d.Type {
 		case Sync, Added, Updated:
-			s.cacheMutationDetector.AddObject(d.Object)
 			if old, exists, err := s.indexer.Get(d.Object); err == nil && exists {
 				if err := s.indexer.Update(d.Object); err != nil {
 					return err

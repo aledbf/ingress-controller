@@ -49,14 +49,17 @@ limitations under the License.
 package leaderelection
 
 import (
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"time"
 
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
-	rl "k8s.io/kubernetes/pkg/client/leaderelection/resourcelock"
+	"k8s.io/kubernetes/pkg/client/record"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/wait"
 
@@ -65,7 +68,10 @@ import (
 )
 
 const (
-	JitterFactor         = 1.2
+	JitterFactor = 1.2
+
+	LeaderElectionRecordAnnotationKey = "control-plane.alpha.kubernetes.io/leader"
+
 	DefaultLeaseDuration = 15 * time.Second
 	DefaultRenewDeadline = 10 * time.Second
 	DefaultRetryPeriod   = 2 * time.Second
@@ -79,8 +85,11 @@ func NewLeaderElector(lec LeaderElectionConfig) (*LeaderElector, error) {
 	if lec.RenewDeadline <= time.Duration(JitterFactor*float64(lec.RetryPeriod)) {
 		return nil, fmt.Errorf("renewDeadline must be greater than retryPeriod*JitterFactor")
 	}
-	if lec.Lock == nil {
-		return nil, fmt.Errorf("Lock must not be nil.")
+	if lec.Client == nil {
+		return nil, fmt.Errorf("Client must not be nil.")
+	}
+	if lec.EventRecorder == nil {
+		return nil, fmt.Errorf("EventRecorder must not be nil.")
 	}
 	return &LeaderElector{
 		config: lec,
@@ -88,8 +97,14 @@ func NewLeaderElector(lec LeaderElectionConfig) (*LeaderElector, error) {
 }
 
 type LeaderElectionConfig struct {
-	// Lock is the resource that will be used for locking
-	Lock rl.Interface
+	// EndpointsMeta should contain a Name and a Namespace of an
+	// Endpoints object that the LeaderElector will attempt to lead.
+	EndpointsMeta api.ObjectMeta
+	// Identity is a unique identifier of the leader elector.
+	Identity string
+
+	Client        client.Interface
+	EventRecorder record.EventRecorder
 
 	// LeaseDuration is the duration that non-leader candidates will
 	// wait to force acquire leadership. This is measured against time of
@@ -131,12 +146,24 @@ type LeaderCallbacks struct {
 type LeaderElector struct {
 	config LeaderElectionConfig
 	// internal bookkeeping
-	observedRecord rl.LeaderElectionRecord
+	observedRecord LeaderElectionRecord
 	observedTime   time.Time
 	// used to implement OnNewLeader(), may lag slightly from the
 	// value observedRecord.HolderIdentity if the transition has
 	// not yet been reported.
 	reportedLeader string
+}
+
+// LeaderElectionRecord is the record that is stored in the leader election annotation.
+// This information should be used for observational purposes only and could be replaced
+// with a random string (e.g. UUID) with only slight modification of this code.
+// TODO(mikedanese): this should potentially be versioned
+type LeaderElectionRecord struct {
+	HolderIdentity       string           `json:"holderIdentity"`
+	LeaseDurationSeconds int              `json:"leaseDurationSeconds"`
+	AcquireTime          unversioned.Time `json:"acquireTime"`
+	RenewTime            unversioned.Time `json:"renewTime"`
+	LeaderTransitions    int              `json:"leaderTransitions"`
 }
 
 // Run starts the leader election loop
@@ -170,7 +197,7 @@ func (le *LeaderElector) GetLeader() string {
 
 // IsLeader returns true if the last observed leader was this client else returns false.
 func (le *LeaderElector) IsLeader() bool {
-	return le.observedRecord.HolderIdentity == le.config.Lock.Identity()
+	return le.observedRecord.HolderIdentity == le.config.Identity
 }
 
 // acquire loops calling tryAcquireOrRenew and returns immediately when tryAcquireOrRenew succeeds.
@@ -179,13 +206,12 @@ func (le *LeaderElector) acquire() {
 	wait.JitterUntil(func() {
 		succeeded := le.tryAcquireOrRenew()
 		le.maybeReportTransition()
-		desc := le.config.Lock.Describe()
 		if !succeeded {
-			glog.V(4).Infof("failed to renew lease %v", desc)
+			glog.V(4).Infof("failed to renew lease %v/%v", le.config.EndpointsMeta.Namespace, le.config.EndpointsMeta.Name)
 			return
 		}
-		le.config.Lock.RecordEvent("became leader")
-		glog.Infof("sucessfully acquired lease %v", desc)
+		le.config.EventRecorder.Eventf(&api.Endpoints{ObjectMeta: le.config.EndpointsMeta}, api.EventTypeNormal, "%v became leader", le.config.Identity)
+		glog.Infof("sucessfully acquired lease %v/%v", le.config.EndpointsMeta.Namespace, le.config.EndpointsMeta.Name)
 		close(stop)
 	}, le.config.RetryPeriod, JitterFactor, true, stop)
 }
@@ -198,13 +224,12 @@ func (le *LeaderElector) renew() {
 			return le.tryAcquireOrRenew(), nil
 		})
 		le.maybeReportTransition()
-		desc := le.config.Lock.Describe()
 		if err == nil {
-			glog.V(4).Infof("succesfully renewed lease %v", desc)
+			glog.V(4).Infof("succesfully renewed lease %v/%v", le.config.EndpointsMeta.Namespace, le.config.EndpointsMeta.Name)
 			return
 		}
-		le.config.Lock.RecordEvent("stopped leading")
-		glog.Infof("failed to renew lease %v", desc)
+		le.config.EventRecorder.Eventf(&api.Endpoints{ObjectMeta: le.config.EndpointsMeta}, api.EventTypeNormal, "%v stopped leading", le.config.Identity)
+		glog.Infof("failed to renew lease %v/%v", le.config.EndpointsMeta.Namespace, le.config.EndpointsMeta.Name)
 		close(stop)
 	}, 0, stop)
 }
@@ -214,22 +239,35 @@ func (le *LeaderElector) renew() {
 // on success else returns false.
 func (le *LeaderElector) tryAcquireOrRenew() bool {
 	now := unversioned.Now()
-	leaderElectionRecord := rl.LeaderElectionRecord{
-		HolderIdentity:       le.config.Lock.Identity(),
+	leaderElectionRecord := LeaderElectionRecord{
+		HolderIdentity:       le.config.Identity,
 		LeaseDurationSeconds: int(le.config.LeaseDuration / time.Second),
 		RenewTime:            now,
 		AcquireTime:          now,
 	}
 
-	// 1. obtain or create the ElectionRecord
-	oldLeaderElectionRecord, err := le.config.Lock.Get()
+	e, err := le.config.Client.Endpoints(le.config.EndpointsMeta.Namespace).Get(le.config.EndpointsMeta.Name)
 	if err != nil {
 		if !errors.IsNotFound(err) {
-			glog.Errorf("error retrieving resource lock %v: %v", le.config.Lock.Describe(), err)
+			glog.Errorf("error retrieving endpoint: %v", err)
 			return false
 		}
-		if err = le.config.Lock.Create(leaderElectionRecord); err != nil {
-			glog.Errorf("error initially creating leader election record: %v", err)
+
+		leaderElectionRecordBytes, err := json.Marshal(leaderElectionRecord)
+		if err != nil {
+			return false
+		}
+		_, err = le.config.Client.Endpoints(le.config.EndpointsMeta.Namespace).Create(&api.Endpoints{
+			ObjectMeta: api.ObjectMeta{
+				Name:      le.config.EndpointsMeta.Name,
+				Namespace: le.config.EndpointsMeta.Namespace,
+				Annotations: map[string]string{
+					LeaderElectionRecordAnnotationKey: string(leaderElectionRecordBytes),
+				},
+			},
+		})
+		if err != nil {
+			glog.Errorf("error initially creating endpoints: %v", err)
 			return false
 		}
 		le.observedRecord = leaderElectionRecord
@@ -237,28 +275,46 @@ func (le *LeaderElector) tryAcquireOrRenew() bool {
 		return true
 	}
 
-	// 2. Record obtained, check the Identity & Time
-	if !reflect.DeepEqual(le.observedRecord, *oldLeaderElectionRecord) {
-		le.observedRecord = *oldLeaderElectionRecord
-		le.observedTime = time.Now()
-	}
-	if le.observedTime.Add(le.config.LeaseDuration).After(now.Time) &&
-		oldLeaderElectionRecord.HolderIdentity != le.config.Lock.Identity() {
-		glog.Infof("lock is held by %v and has not yet expired", oldLeaderElectionRecord.HolderIdentity)
-		return false
+	if e.Annotations == nil {
+		e.Annotations = make(map[string]string)
 	}
 
-	// 3. We're going to try to update. The leaderElectionRecord is set to it's default
+	var oldLeaderElectionRecord LeaderElectionRecord
+
+	if oldLeaderElectionRecordBytes, found := e.Annotations[LeaderElectionRecordAnnotationKey]; found {
+		if err := json.Unmarshal([]byte(oldLeaderElectionRecordBytes), &oldLeaderElectionRecord); err != nil {
+			glog.Errorf("error unmarshaling leader election record: %v", err)
+			return false
+		}
+		if !reflect.DeepEqual(le.observedRecord, oldLeaderElectionRecord) {
+			le.observedRecord = oldLeaderElectionRecord
+			le.observedTime = time.Now()
+		}
+		if le.observedTime.Add(le.config.LeaseDuration).After(now.Time) &&
+			oldLeaderElectionRecord.HolderIdentity != le.config.Identity {
+			glog.Infof("lock is held by %v and has not yet expired", oldLeaderElectionRecord.HolderIdentity)
+			return false
+		}
+	}
+
+	// We're going to try to update. The leaderElectionRecord is set to it's default
 	// here. Let's correct it before updating.
-	if oldLeaderElectionRecord.HolderIdentity == le.config.Lock.Identity() {
+	if oldLeaderElectionRecord.HolderIdentity == le.config.Identity {
 		leaderElectionRecord.AcquireTime = oldLeaderElectionRecord.AcquireTime
 	} else {
 		leaderElectionRecord.LeaderTransitions = oldLeaderElectionRecord.LeaderTransitions + 1
 	}
 
-	// update the lock itself
-	if err = le.config.Lock.Update(leaderElectionRecord); err != nil {
-		glog.Errorf("Failed to update lock: %v", err)
+	leaderElectionRecordBytes, err := json.Marshal(leaderElectionRecord)
+	if err != nil {
+		glog.Errorf("err marshaling leader election record: %v", err)
+		return false
+	}
+	e.Annotations[LeaderElectionRecordAnnotationKey] = string(leaderElectionRecordBytes)
+
+	_, err = le.config.Client.Endpoints(le.config.EndpointsMeta.Namespace).Update(e)
+	if err != nil {
+		glog.Errorf("err: %v", err)
 		return false
 	}
 	le.observedRecord = leaderElectionRecord

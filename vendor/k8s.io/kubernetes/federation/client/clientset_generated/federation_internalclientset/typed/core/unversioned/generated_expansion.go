@@ -16,8 +16,6 @@ limitations under the License.
 
 package unversioned
 
-type ConfigMapExpansion interface{}
-
 type EventExpansion interface{}
 
 type SecretExpansion interface{}
