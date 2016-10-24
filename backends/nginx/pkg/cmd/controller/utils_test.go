@@ -20,13 +20,13 @@ import "testing"
 
 func TestDiff(t *testing.T) {
 	tests := []struct {
-		a   []byte
-		b   []byte
-		len int
+		a     []byte
+		b     []byte
+		empty bool
 	}{
-		{[]byte(""), []byte(""), 0},
-		{[]byte("a"), []byte("a"), 0},
-		{[]byte("a"), []byte("b"), 274},
+		{[]byte(""), []byte(""), true},
+		{[]byte("a"), []byte("a"), true},
+		{[]byte("a"), []byte("b"), false},
 	}
 
 	for _, test := range tests {
@@ -34,8 +34,8 @@ func TestDiff(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unexpected error returned: %v", err)
 		}
-		if len(b) != test.len {
-			t.Fatalf("expected %v but %v returned", test.len, len(b))
+		if len(b) == 0 && !test.empty {
+			t.Fatalf("expected empty but returned %s", b)
 		}
 	}
 }

@@ -105,11 +105,12 @@ func (n NGINXController) Restart(data []byte) ([]byte, error) {
 	return exec.Command(n.binary, "-s", "reload").CombinedOutput()
 }
 
-// Test ...
+// Test checks is a file contains a valid NGINX configuration
 func (n NGINXController) Test(file string) *exec.Cmd {
 	return exec.Command(n.binary, "-t", "-c", file)
 }
 
+// UpstreamDefaults returns the nginx defaults
 func (n NGINXController) UpstreamDefaults() defaults.Backend {
 	d := config.NewDefault()
 	return d.Backend
