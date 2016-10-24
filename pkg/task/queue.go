@@ -60,10 +60,6 @@ func (t *Queue) Enqueue(obj interface{}) {
 	t.queue.Add(key)
 }
 
-func (t *Queue) requeue(key interface{}) {
-	t.queue.AddRateLimited(key)
-}
-
 func (t *Queue) defaultKeyFunc(obj interface{}) (string, error) {
 	key, err := keyFunc(obj)
 	if err != nil {
@@ -85,7 +81,7 @@ func (t *Queue) worker() {
 		glog.V(3).Infof("syncing %v", key)
 		if err := t.sync(key); err != nil {
 			glog.Warningf("requeuing %v, err %v", key, err)
-			t.requeue(key)
+			t.queue.AddRateLimited(key)
 		} else {
 			t.queue.Forget(key)
 		}
