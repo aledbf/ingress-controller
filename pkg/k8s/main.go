@@ -25,25 +25,25 @@ import (
 	"k8s.io/kubernetes/pkg/client/unversioned"
 )
 
-// IsValidService ...
-func IsValidService(kubeClient unversioned.Interface, nsName string) (*api.Service, error) {
-	ns, name, err := ParseNameNS(nsName)
+// IsValidService checks if exists a service with the specified name
+func IsValidService(kubeClient unversioned.Interface, name string) (*api.Service, error) {
+	ns, name, err := ParseNameNS(name)
 	if err != nil {
 		return nil, err
 	}
 	return kubeClient.Services(ns).Get(name)
 }
 
-// IsValidSecret ...
-func IsValidSecret(kubeClient unversioned.Interface, nsName string) (*api.Secret, error) {
-	ns, name, err := ParseNameNS(nsName)
+// IsValidSecret checks if exists a secret with the specified name
+func IsValidSecret(kubeClient unversioned.Interface, name string) (*api.Secret, error) {
+	ns, name, err := ParseNameNS(name)
 	if err != nil {
 		return nil, err
 	}
 	return kubeClient.Secrets(ns).Get(name)
 }
 
-// ParseNameNS ...
+// ParseNameNS parses a string searching a namespace and name
 func ParseNameNS(input string) (string, string, error) {
 	nsName := strings.Split(input, "/")
 	if len(nsName) != 2 {
@@ -76,12 +76,14 @@ func GetNodeIP(kubeClient *unversioned.Client, name string) string {
 	return externalIP
 }
 
-// PodInfo contains runtime information about the pod
+// PodInfo contains runtime information about the pod running the Ingres controller
 type PodInfo struct {
 	Name      string
 	Namespace string
 	NodeIP    string
-	Labels    map[string]string
+	// Labels selectors of the running pod
+	// This is used to search for other Ingress controller pods
+	Labels map[string]string
 }
 
 // GetPodDetails returns runtime information about the pod:

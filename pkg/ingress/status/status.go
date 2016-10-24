@@ -122,7 +122,12 @@ func (s *statusSync) run() {
 			return true, nil
 		}
 		// send a dummy object to the queue to force a sync
-		s.syncQueue.Enqueue("default/dummy")
+		s.syncQueue.Enqueue(&dummyObject{
+			ObjectMeta: api.ObjectMeta{
+				Name:      "default",
+				Namespace: "dummy",
+			},
+		})
 		return false, nil
 	})
 	if err != nil {

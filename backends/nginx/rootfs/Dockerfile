@@ -23,4 +23,6 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get update && apt-get install -y \
 
 COPY . /
 
+RUN mkdir -p /ingress-controller/ssl
+
 CMD ["/nginx-ingress-controller"]

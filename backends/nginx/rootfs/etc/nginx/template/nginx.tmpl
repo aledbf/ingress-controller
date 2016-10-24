@@ -188,7 +188,7 @@ http {
     server {
         server_name {{ $server.Name }};
         listen 80{{ if $cfg.useProxyProtocol }} proxy_protocol{{ end }};
-        {{ if $server.SSL }}listen 443 {{ if $cfg.useProxyProtocol }}proxy_protocol{{ end }} ssl {{ if $cfg.useHttp2 }}http2{{ end }};
+        {{ if $server.SSL }}listen 442 {{ if $cfg.useProxyProtocol }}proxy_protocol{{ end }} ssl {{ if $cfg.useHttp2 }}http2{{ end }};
         {{/* comment PEM sha is required to detect changes in the generated configuration and force a reload */}}
         # PEM sha: {{ $server.SSLPemChecksum }}
         ssl_certificate                         {{ $server.SSLCertificate }};
@@ -374,6 +374,24 @@ http {
 }
 
 stream {
+    # map FQDN that requires SSL passthrough
+    map $ssl_preread_server_name $name {
+        # backend.example.com      backend;
+        # send SSL traffic to this nginx in a different port 
+        default                  nginx-ssl-backend;
+    }
+
+    # configure default backend for SSL
+    upstream nginx-ssl-backend {
+        server 127.0.0.1:442;
+    }
+
+    server {
+        listen                  443;
+        proxy_pass              $name;
+        ssl_preread             on;
+    }
+
 # TCP services
 {{ range $i, $tcpServer := .tcpUpstreams }}
     upstream tcp-{{ $tcpServer.Upstream.Name }} {

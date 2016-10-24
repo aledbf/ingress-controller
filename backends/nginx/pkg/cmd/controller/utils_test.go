@@ -14,27 +14,28 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cache
+package main
 
-import "k8s.io/kubernetes/pkg/client/cache"
+import "testing"
 
-// StoreToIngressLister makes a Store that lists Ingress.
-type StoreToIngressLister struct {
-	cache.Store
-}
+func TestDiff(t *testing.T) {
+	tests := []struct {
+		a   []byte
+		b   []byte
+		len int
+	}{
+		{[]byte(""), []byte(""), 0},
+		{[]byte("a"), []byte("a"), 0},
+		{[]byte("a"), []byte("b"), 274},
+	}
 
-// StoreToSecretsLister makes a Store that lists Secrets.
-type StoreToSecretsLister struct {
-	cache.Store
-}
-
-// StoreToConfigmapLister makes a Store that lists Configmap.
-type StoreToConfigmapLister struct {
-	cache.Store
-}
-
-// StoreToSSLCertLister make s Store that lists SSL certificates
-// used in Ingress rules
-type StoreToSSLCertLister struct {
-	cache.Store
+	for _, test := range tests {
+		b, err := diff(test.a, test.b)
+		if err != nil {
+			t.Fatalf("unexpected error returned: %v", err)
+		}
+		if len(b) != test.len {
+			t.Fatalf("expected %v but %v returned", test.len, len(b))
+		}
+	}
 }

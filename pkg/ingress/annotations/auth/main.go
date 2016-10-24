@@ -27,7 +27,6 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
 )
 
 const (
@@ -70,7 +69,7 @@ type BasicDigest struct {
 // rule used to add authentication in the paths defined in the rule
 // and generated an htpasswd compatible file to be used as source
 // during the authentication process
-func ParseAnnotations(kubeClient client.Interface, ing *extensions.Ingress, authDir string) (*BasicDigest, error) {
+func ParseAnnotations(ing *extensions.Ingress, authDir string, fn func(string) (*api.Secret, error)) (*BasicDigest, error) {
 	if ing.GetAnnotations() == nil {
 		return &BasicDigest{}, parser.ErrMissingAnnotations
 	}
@@ -89,7 +88,7 @@ func ParseAnnotations(kubeClient client.Interface, ing *extensions.Ingress, auth
 		return &BasicDigest{}, err
 	}
 
-	secret, err := kubeClient.Secrets(ing.Namespace).Get(s)
+	secret, err := fn(fmt.Sprintf("%v/%v", ing.Namespace, s))
 	if err != nil {
 		return &BasicDigest{}, err
 	}

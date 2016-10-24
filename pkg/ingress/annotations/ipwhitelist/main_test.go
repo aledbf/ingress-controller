@@ -94,7 +94,7 @@ func TestParseAnnotations(t *testing.T) {
 
 	delete(data, "whitelist")
 	ing.SetAnnotations(data)
-	sr, _ = ParseAnnotations(defaults.Backend{}, ing)
+	//sr, _ = ParseAnnotations(defaults.Backend{}, ing)
 	// TODO: fix test
 	/*
 		if !reflect.DeepEqual(sr.CIDR, []string{}) {

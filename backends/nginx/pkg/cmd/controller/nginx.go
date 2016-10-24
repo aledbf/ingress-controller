@@ -166,6 +166,7 @@ func (n NGINXController) testTemplate(cfg []byte) error {
 	ioutil.WriteFile(tmpfile.Name(), cfg, 0644)
 	out, err := n.Test(tmpfile.Name()).CombinedOutput()
 	if err != nil {
+		// this error is different from the rest because it must be clear why nginx is not working
 		return fmt.Errorf(`
 -------------------------------------------------------------------------------
 Error: %v

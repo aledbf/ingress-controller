@@ -41,7 +41,7 @@ func (ic *GenericController) syncSecret(k interface{}) error {
 	}
 
 	// check if the default certificate is configured
-	_, exists, err = ic.secretLister.Store.GetByKey(defServerName)
+	_, exists, err := ic.secretLister.Store.GetByKey(defServerName)
 	if err != nil {
 		return nil
 	}
