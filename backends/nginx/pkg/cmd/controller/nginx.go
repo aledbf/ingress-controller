@@ -40,6 +40,9 @@ var (
 	binary   = "/usr/sbin/nginx"
 )
 
+// newNGINXController creates a new NGINX Ingress controller.
+// If the environment variable NGINX_BINARY exists it will be used
+// as source for nginx commands
 func newNGINXController() ingress.Controller {
 	ngx := os.Getenv("NGINX_BINARY")
 	if ngx == "" {
@@ -51,7 +54,12 @@ func newNGINXController() ingress.Controller {
 	onChange = func() {
 		template, err := ngx_template.NewTemplate(tmplPath, onChange)
 		if err != nil {
-			glog.Warningf("invalid template: %v", err)
+			// this error is different from the rest because it must be clear why nginx is not working
+			glog.Errorf(`
+-------------------------------------------------------------------------------
+Error loading new template : %v
+-------------------------------------------------------------------------------
+`, err)
 			return
 		}
 
