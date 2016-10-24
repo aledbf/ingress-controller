@@ -336,6 +336,7 @@ func (ic GenericController) Check(_ *http.Request) error {
 	return nil
 }
 
+// getSecret searchs for a secret in the local secrets Store
 func (ic *GenericController) getSecret(name string) (*api.Secret, error) {
 	s, exists, err := ic.secrLister.Store.GetByKey(name)
 	if err != nil {
@@ -859,6 +860,12 @@ func (ic *GenericController) createServers(data []interface{}, upstreams map[str
 	for _, ingIf := range data {
 		ing := ingIf.(*extensions.Ingress)
 
+		sslpt, err := sslpassthrough.ParseAnnotations(upsDefaults, ing)
+		glog.V(5).Infof("ssl passthrough annotation: %v", sslpt)
+		if err != nil {
+			glog.V(3).Infof("error reading ssl passthrough annotation in Ingress %v/%v: %v", ing.GetNamespace(), ing.GetName(), err)
+		}
+
 		for _, rule := range ing.Spec.Rules {
 			host := rule.Host
 			if host == "" {
@@ -867,39 +874,29 @@ func (ic *GenericController) createServers(data []interface{}, upstreams map[str
 
 			if _, ok := servers[host]; ok {
 				glog.V(3).Infof("rule %v/%v uses a host already defined. Skipping server creation", ing.GetNamespace(), ing.GetName())
-			} else {
-				locs := []*ingress.Location{}
-				loc := &ingress.Location{
-					Path:         rootLocation,
-					IsDefBackend: true,
-					Upstream:     *ic.getDefaultUpstream(),
-					Proxy:        ngxProxy,
-				}
+				continue
+			}
+			locs := []*ingress.Location{}
+			loc := &ingress.Location{
+				Path:         rootLocation,
+				IsDefBackend: true,
+				Upstream:     *ic.getDefaultUpstream(),
+				Proxy:        ngxProxy,
+			}
 
-				if ing.Spec.Backend != nil {
-					defUpstream := fmt.Sprintf("default-backend-%v-%v-%v", ing.GetNamespace(), ing.Spec.Backend.ServiceName, ing.Spec.Backend.ServicePort.String())
-					if backendUpstream, ok := upstreams[defUpstream]; ok {
-						if host == "" || host == defServerName {
-							ic.recorder.Eventf(ing, api.EventTypeWarning, "MAPPING", "error: rules with Spec.Backend are allowed with hostnames")
-						} else {
-							loc.Upstream = *backendUpstream
-						}
+			if ing.Spec.Backend != nil {
+				defUpstream := fmt.Sprintf("default-backend-%v-%v-%v", ing.GetNamespace(), ing.Spec.Backend.ServiceName, ing.Spec.Backend.ServicePort.String())
+				if backendUpstream, ok := upstreams[defUpstream]; ok {
+					if host == "" || host == defServerName {
+						ic.recorder.Eventf(ing, api.EventTypeWarning, "MAPPING", "error: rules with Spec.Backend are allowed with hostnames")
+					} else {
+						loc.Upstream = *backendUpstream
 					}
 				}
-
-				locs = append(locs, loc)
-				servers[host] = &ingress.Server{Name: host, Locations: locs}
 			}
 
-			sslpt, err := sslpassthrough.ParseAnnotations(upsDefaults, ing)
-			glog.V(5).Infof("ssl passthrough annotation: %v", sslpt)
-			if err != nil {
-				glog.V(3).Infof("error reading ssl passthrough annotation in Ingress %v/%v: %v", ing.GetNamespace(), ing.GetName(), err)
-			}
-			if sslpt {
-				server := servers[host]
-				server.SSPassthrough = true
-			}
+			locs = append(locs, loc)
+			servers[host] = &ingress.Server{Name: host, Locations: locs, SSPassthrough: sslpt}
 
 			bc, exists, _ := ic.secretLister.GetByKey(host)
 			if exists {
@@ -949,18 +946,19 @@ func (ic *GenericController) getEndpoints(
 				port, err := service.GetPortMapping(servicePort.StrVal, s)
 				if err == nil {
 					targetPort = port
-				} else {
-					glog.Warningf("error mapping service port: %v", err)
-					err := ic.checkSvcForUpdate(s)
-					if err != nil {
-						glog.Warningf("error mapping service ports: %v", err)
-						continue
-					}
+					continue
+				}
 
-					port, err := service.GetPortMapping(servicePort.StrVal, s)
-					if err == nil {
-						targetPort = port
-					}
+				glog.Warningf("error mapping service port: %v", err)
+				err = ic.checkSvcForUpdate(s)
+				if err != nil {
+					glog.Warningf("error mapping service ports: %v", err)
+					continue
+				}
+
+				port, err = service.GetPortMapping(servicePort.StrVal, s)
+				if err == nil {
+					targetPort = port
 				}
 			}
 
