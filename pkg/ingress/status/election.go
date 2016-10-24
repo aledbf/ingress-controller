@@ -25,9 +25,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/leaderelection"
-	"k8s.io/kubernetes/pkg/client/leaderelection/resourcelock"
 	"k8s.io/kubernetes/pkg/client/record"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 )
@@ -37,11 +35,11 @@ func getCurrentLeader(electionID, namespace string, c client.Interface) (string,
 	if err != nil {
 		return "", nil, err
 	}
-	val, found := endpoints.Annotations[resourcelock.LeaderElectionRecordAnnotationKey]
+	val, found := endpoints.Annotations[leaderelection.LeaderElectionRecordAnnotationKey]
 	if !found {
 		return "", endpoints, nil
 	}
-	electionRecord := resourcelock.LeaderElectionRecord{}
+	electionRecord := leaderelection.LeaderElectionRecord{}
 	if err = json.Unmarshal([]byte(val), &electionRecord); err != nil {
 		return "", nil, err
 	}
@@ -55,8 +53,7 @@ func NewElection(electionID,
 	namespace string,
 	ttl time.Duration,
 	callback func(leader string),
-	c client.Interface,
-	leaderElectionClient *clientset.Clientset) (*leaderelection.LeaderElector, error) {
+	c client.Interface) (*leaderelection.LeaderElector, error) {
 
 	_, err := c.Endpoints(namespace).Get(electionID)
 	if err != nil {
@@ -100,17 +97,11 @@ func NewElection(electionID,
 		Host:      hostname,
 	})
 
-	lock := resourcelock.EndpointsLock{
-		EndpointsMeta: api.ObjectMeta{Namespace: namespace, Name: electionID},
-		Client:        leaderElectionClient,
-		LockConfig: resourcelock.ResourceLockConfig{
-			Identity:      id,
-			EventRecorder: recorder,
-		},
-	}
-
 	config := leaderelection.LeaderElectionConfig{
-		Lock:          &lock,
+		EndpointsMeta: api.ObjectMeta{Namespace: namespace, Name: electionID},
+		Client:        c,
+		Identity:      id,
+		EventRecorder: recorder,
 		LeaseDuration: ttl,
 		RenewDeadline: ttl / 2,
 		RetryPeriod:   ttl / 4,

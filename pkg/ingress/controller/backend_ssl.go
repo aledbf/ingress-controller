@@ -23,15 +23,16 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/client/cache"
 
 	"github.com/aledbf/ingress-controller/pkg/ingress"
 	ssl "github.com/aledbf/ingress-controller/pkg/net/ssl"
+	"github.com/golang/glog"
 )
 
 // syncSecret keeps in sync Secrets used by Ingress rules with files to allow
 // being used in controllers.
 func (ic *GenericController) syncSecret(k interface{}) error {
-	ic.syncRateLimiter.Accept()
 	if ic.secretQueue.IsShuttingDown() {
 		return nil
 	}
@@ -41,11 +42,10 @@ func (ic *GenericController) syncSecret(k interface{}) error {
 	}
 
 	// check if the default certificate is configured
-	_, exists, err := ic.secretLister.Store.GetByKey(defServerName)
-	if err != nil {
-		return nil
-	}
+	key := fmt.Sprintf("default/%v", defServerName)
+	_, exists := ic.sslCertTracker.Get(key)
 	var cert *ingress.SSLCert
+	var err error
 	if !exists {
 		if ic.cfg.DefaultSSLCertificate != "" {
 			cert, err = ic.getPemCertificate(ic.cfg.DefaultSSLCertificate)
@@ -59,13 +59,15 @@ func (ic *GenericController) syncSecret(k interface{}) error {
 				return nil
 			}
 		}
-		err = ic.secretLister.Store.Add(&cert)
-		if err != nil {
-			return err
-		}
+		cert.Name = defServerName
+		cert.Namespace = api.NamespaceDefault
+		cert.Kind = "SSLCert"
+		cert.APIVersion = "v1"
+
+		ic.sslCertTracker.Add(key, cert)
 	}
 
-	key := k.(string)
+	key = k.(string)
 
 	// get secret
 	secObj, exists, err := ic.secrLister.Store.GetByKey(key)
@@ -73,23 +75,29 @@ func (ic *GenericController) syncSecret(k interface{}) error {
 		return fmt.Errorf("error getting secret %v: %v", key, err)
 	}
 	if !exists {
-		return fmt.Errorf("service %v was not found", key)
+		return fmt.Errorf("secret %v was not found", key)
 	}
 	sec := secObj.(*api.Secret)
 	if !ic.secrReferenced(sec.Name, sec.Namespace) {
+		glog.V(2).Infof("secret %v/%v is not used in Ingress rules. Skipping ", sec.Namespace, sec.Name)
 		return nil
 	}
 
 	// create certificates and add or update the item in the store
-	_, exists, err = ic.secretLister.Store.GetByKey(key)
-	cert, err = ic.getPemCertificate(ic.cfg.DefaultSSLCertificate)
+	_, exists = ic.sslCertTracker.Get(key)
+
+	cert, err = ic.getPemCertificate(key)
 	if err != nil {
 		return err
 	}
+
 	if exists {
-		return ic.secretLister.Store.Update(cert)
+		ic.sslCertTracker.Update(key, cert)
+		return nil
 	}
-	return ic.secretLister.Store.Add(cert)
+
+	ic.sslCertTracker.Add(key, cert)
+	return nil
 }
 
 func (ic *GenericController) getPemCertificate(secretName string) (*ingress.SSLCert, error) {
@@ -114,11 +122,18 @@ func (ic *GenericController) getPemCertificate(secretName string) (*ingress.SSLC
 	ca := secret.Data["ca.crt"]
 
 	nsSecName := strings.Replace(secretName, "/", "-", -1)
-	return ssl.AddOrUpdateCertAndKey(nsSecName, string(cert), string(key), string(ca))
+	s, err := ssl.AddOrUpdateCertAndKey(nsSecName, string(cert), string(key), string(ca))
+	if err != nil {
+		return nil, err
+	}
+
+	s.Name = secret.Name
+	s.Namespace = secret.Namespace
+	return s, nil
 }
 
 // check if secret is referenced in this controller's config
-func (ic *GenericController) secrReferenced(namespace string, name string) bool {
+func (ic *GenericController) secrReferenced(name, namespace string) bool {
 	for _, ingIf := range ic.ingLister.Store.List() {
 		ing := ingIf.(*extensions.Ingress)
 		if ing.Namespace != namespace {
@@ -131,4 +146,15 @@ func (ic *GenericController) secrReferenced(namespace string, name string) bool 
 		}
 	}
 	return false
+}
+
+// sslCertTracker ...
+type sslCertTracker struct {
+	cache.ThreadSafeStore
+}
+
+func newSSLCertTracker() *sslCertTracker {
+	return &sslCertTracker{
+		cache.NewThreadSafeStore(cache.Indexers{}, cache.Indices{}),
+	}
 }

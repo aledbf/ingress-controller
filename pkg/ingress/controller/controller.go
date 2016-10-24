@@ -104,8 +104,7 @@ type GenericController struct {
 	syncStatus status.Sync
 
 	// controller for SSL certificates
-	secretController *cache.Controller
-	secretLister     cache_store.StoreToSSLCertLister
+	sslCertTracker *sslCertTracker
 	// TaskQueue in charge of keep the secrets referenced from Ingress
 	// in sync with the files on disk
 	secretQueue *task.Queue
@@ -156,6 +155,9 @@ func newIngressController(config *Configuration) IController {
 		}),
 	}
 
+	ic.syncQueue = task.NewTaskQueue(ic.sync)
+	ic.secretQueue = task.NewTaskQueue(ic.syncSecret)
+
 	ingEventHandler := cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			addIng := obj.(*extensions.Ingress)
@@ -191,14 +193,17 @@ func newIngressController(config *Configuration) IController {
 
 	secrEventHandler := cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
-			ic.secretQueue.Enqueue(obj)
+			sec := obj.(*api.Secret)
+			ic.secretQueue.Enqueue(sec)
 		},
 		DeleteFunc: func(obj interface{}) {
-			ic.secretQueue.Enqueue(obj)
+			sec := obj.(*api.Secret)
+			ic.sslCertTracker.Delete(fmt.Sprintf("%v/%v", sec.Namespace, sec.Name))
 		},
 		UpdateFunc: func(old, cur interface{}) {
 			if !reflect.DeepEqual(old, cur) {
-				ic.secretQueue.Enqueue(cur)
+				sec := cur.(*api.Secret)
+				ic.secretQueue.Enqueue(sec)
 			}
 		},
 	}
@@ -253,7 +258,7 @@ func newIngressController(config *Configuration) IController {
 		},
 		&api.Endpoints{}, ic.cfg.ResyncPeriod, eventHandler)
 
-	ic.svcLister.Indexer, ic.svcController = cache.NewIndexerInformer(
+	ic.svcLister.Store, ic.svcController = cache.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(opts api.ListOptions) (runtime.Object, error) {
 				return ic.cfg.Client.Services(ic.cfg.Namespace).List(opts)
@@ -262,10 +267,7 @@ func newIngressController(config *Configuration) IController {
 				return ic.cfg.Client.Services(ic.cfg.Namespace).Watch(options)
 			},
 		},
-		&api.Service{},
-		ic.cfg.ResyncPeriod,
-		cache.ResourceEventHandlerFuncs{},
-		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+		&api.Service{}, ic.cfg.ResyncPeriod, cache.ResourceEventHandlerFuncs{})
 
 	ic.secrLister.Store, ic.secrController = cache.NewInformer(
 		&cache.ListWatch{
@@ -289,12 +291,7 @@ func newIngressController(config *Configuration) IController {
 		},
 		&api.ConfigMap{}, ic.cfg.ResyncPeriod, mapEventHandler)
 
-	ic.secretLister.Store, ic.secretController = cache.NewInformer(
-		&cache.ListWatch{},
-		&ingress.SSLCert{},
-		ic.cfg.ResyncPeriod,
-		cache.ResourceEventHandlerFuncs{},
-	)
+	ic.sslCertTracker = newSSLCertTracker()
 
 	ic.syncStatus = status.NewStatusSyncer(status.Config{
 		Client:         config.Client,
@@ -302,10 +299,6 @@ func newIngressController(config *Configuration) IController {
 		PublishService: ic.cfg.PublishService,
 		IngressLister:  ic.ingLister,
 	})
-
-	ic.syncQueue = task.NewTaskQueue(ic.sync)
-
-	ic.secretQueue = task.NewTaskQueue(ic.syncSecret)
 
 	return ic
 }
@@ -475,7 +468,7 @@ func (ic *GenericController) getStreamServices(data map[string]string, proto api
 			continue
 		}
 
-		svcObj, svcExists, err := ic.svcLister.Indexer.GetByKey(nsName)
+		svcObj, svcExists, err := ic.svcLister.Store.GetByKey(nsName)
 		if err != nil {
 			glog.Warningf("error getting service %v: %v", nsName, err)
 			continue
@@ -534,7 +527,7 @@ func (ic *GenericController) getDefaultUpstream() *ingress.Upstream {
 		Name: defUpstreamName,
 	}
 	svcKey := ic.cfg.DefaultService
-	svcObj, svcExists, err := ic.svcLister.Indexer.GetByKey(svcKey)
+	svcObj, svcExists, err := ic.svcLister.Store.GetByKey(svcKey)
 	if err != nil {
 		glog.Warningf("unexpected error searching the default backend %v: %v", ic.cfg.DefaultService, err)
 		upstream.Backends = append(upstream.Backends, newDefaultServer())
@@ -734,11 +727,7 @@ func (ic *GenericController) getUpstreamServers(data []interface{}) ([]*ingress.
 }
 
 func (ic *GenericController) getAuthCertificate(secretName string) (*authtls.SSLCert, error) {
-	bc, exists, err := ic.secretLister.GetByKey(secretName)
-	if err != nil {
-		return nil, err
-	}
-
+	bc, exists := ic.sslCertTracker.Get(secretName)
 	if !exists {
 		return nil, fmt.Errorf("service %v does not exists", secretName)
 	}
@@ -809,7 +798,7 @@ func (ic *GenericController) createUpstreams(data []interface{}) map[string]*ing
 // to a service.
 func (ic *GenericController) serviceEndpoints(svcKey, backendPort string,
 	hz *healthcheck.Upstream) ([]ingress.UpstreamServer, error) {
-	svcObj, svcExists, err := ic.svcLister.Indexer.GetByKey(svcKey)
+	svcObj, svcExists, err := ic.svcLister.Store.GetByKey(svcKey)
 
 	var upstreams []ingress.UpstreamServer
 	if err != nil {
@@ -860,6 +849,7 @@ func (ic *GenericController) createServers(data []interface{}, upstreams map[str
 	for _, ingIf := range data {
 		ing := ingIf.(*extensions.Ingress)
 
+		// check if ssl passthrough is configured
 		sslpt, err := sslpassthrough.ParseAnnotations(upsDefaults, ing)
 		glog.V(5).Infof("ssl passthrough annotation: %v", sslpt)
 		if err != nil {
@@ -898,14 +888,17 @@ func (ic *GenericController) createServers(data []interface{}, upstreams map[str
 			locs = append(locs, loc)
 			servers[host] = &ingress.Server{Name: host, Locations: locs, SSPassthrough: sslpt}
 
-			bc, exists, _ := ic.secretLister.GetByKey(host)
-			if exists {
-				cert := bc.(*ingress.SSLCert)
-				server := servers[host]
-				server.SSL = true
-				server.SSLCertificate = cert.PemFileName
-				server.SSLCertificateKey = cert.PemFileName
-				server.SSLPemChecksum = cert.PemSHA
+			if len(ing.Spec.TLS) > 0 {
+				key := fmt.Sprintf("%v/%v", ing.Namespace, ing.Spec.TLS[0].SecretName)
+				bc, exists := ic.sslCertTracker.Get(key)
+				if exists {
+					cert := bc.(*ingress.SSLCert)
+					server := servers[host]
+					server.SSL = true
+					server.SSLCertificate = cert.PemFileName
+					server.SSLCertificateKey = cert.PemFileName
+					server.SSLPemChecksum = cert.PemSHA
+				}
 			}
 		}
 	}
@@ -1011,8 +1004,8 @@ func (ic GenericController) Start() {
 	go ic.secrController.Run(ic.stopCh)
 	go ic.mapController.Run(ic.stopCh)
 
-	go ic.syncQueue.Run(time.Second, ic.stopCh)
 	go ic.secretQueue.Run(time.Second, ic.stopCh)
+	go ic.syncQueue.Run(time.Second, ic.stopCh)
 
 	go ic.syncStatus.Run(ic.stopCh)
 
