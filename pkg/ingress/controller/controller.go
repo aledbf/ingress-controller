@@ -840,6 +840,7 @@ func (ic *GenericController) createServers(data []interface{}, upstreams map[str
 
 	upsDefaults := ic.cfg.Backend.UpstreamDefaults()
 
+	// default server
 	locs := []*ingress.Location{}
 	locs = append(locs, &ingress.Location{
 		Path:         rootLocation,
@@ -849,9 +850,9 @@ func (ic *GenericController) createServers(data []interface{}, upstreams map[str
 	})
 	servers[defServerName] = &ingress.Server{Name: defServerName, Locations: locs}
 
+	// initialize all the servers
 	for _, ingIf := range data {
 		ing := ingIf.(*extensions.Ingress)
-
 		// check if ssl passthrough is configured
 		sslpt, err := sslpassthrough.ParseAnnotations(upsDefaults, ing)
 		glog.V(5).Infof("ssl passthrough annotation: %v", sslpt)
@@ -866,9 +867,39 @@ func (ic *GenericController) createServers(data []interface{}, upstreams map[str
 			}
 
 			if _, ok := servers[host]; ok {
-				glog.V(3).Infof("rule %v/%v uses a host already defined. Skipping server creation", ing.GetNamespace(), ing.GetName())
 				continue
 			}
+
+			servers[host] = &ingress.Server{Name: host, Locations: locs, SSPassthrough: sslpt}
+		}
+	}
+
+	for _, ingIf := range data {
+		ing := ingIf.(*extensions.Ingress)
+
+		for _, rule := range ing.Spec.Rules {
+			host := rule.Host
+			if host == "" {
+				host = defServerName
+			}
+
+			if len(ing.Spec.TLS) > 0 {
+				key := fmt.Sprintf("%v/%v", ing.Namespace, ing.Spec.TLS[0].SecretName)
+				bc, exists := ic.sslCertTracker.Get(key)
+				if exists {
+					cert := bc.(*ingress.SSLCert)
+					server := servers[host]
+					server.SSL = true
+					server.SSLCertificate = cert.PemFileName
+					server.SSLCertificateKey = cert.PemFileName
+					server.SSLPemChecksum = cert.PemSHA
+				}
+			}
+
+			if len(servers[host].Locations) > 0 {
+				continue
+			}
+
 			locs := []*ingress.Location{}
 			loc := &ingress.Location{
 				Path:         rootLocation,
@@ -889,20 +920,7 @@ func (ic *GenericController) createServers(data []interface{}, upstreams map[str
 			}
 
 			locs = append(locs, loc)
-			servers[host] = &ingress.Server{Name: host, Locations: locs, SSPassthrough: sslpt}
-
-			if len(ing.Spec.TLS) > 0 {
-				key := fmt.Sprintf("%v/%v", ing.Namespace, ing.Spec.TLS[0].SecretName)
-				bc, exists := ic.sslCertTracker.Get(key)
-				if exists {
-					cert := bc.(*ingress.SSLCert)
-					server := servers[host]
-					server.SSL = true
-					server.SSLCertificate = cert.PemFileName
-					server.SSLCertificateKey = cert.PemFileName
-					server.SSLPemChecksum = cert.PemSHA
-				}
-			}
+			servers[host].Locations = locs
 		}
 	}
 
