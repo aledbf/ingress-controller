@@ -79,11 +79,12 @@ type Controller interface {
 
 // Configuration describes
 type Configuration struct {
-	HealthzURL   string
-	Upstreams    []*Upstream
-	Servers      []*Server
-	TCPUpstreams []*Location
-	UDPUpstreams []*Location
+	HealthzURL           string
+	Upstreams            []*Upstream
+	Servers              []*Server
+	TCPUpstreams         []*Location
+	UDPUpstreams         []*Location
+	PassthroughUpstreams []*SSLPassthroughUpstreams
 }
 
 // Upstream describes an upstream server (endpoint)
@@ -95,6 +96,12 @@ type Upstream struct {
 	Backends []UpstreamServer
 	// Secure indicates if the communication with the en
 	Secure bool
+}
+
+type SSLPassthroughUpstreams struct {
+	Upstream
+
+	Host string
 }
 
 // UpstreamByNameServers sorts upstreams by name

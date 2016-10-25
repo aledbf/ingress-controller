@@ -231,6 +231,7 @@ func (n NGINXController) OnUpdate(cmap *api.ConfigMap, ingressCfg ingress.Config
 	// adjust the size of the backlog
 	conf["backlogSize"] = sysctlSomaxconn()
 	conf["upstreams"] = ingressCfg.Upstreams
+	conf["passthroughUpstreams"] = ingressCfg.PassthroughUpstreams
 	conf["servers"] = ingressCfg.Servers
 	conf["tcpUpstreams"] = ingressCfg.TCPUpstreams
 	conf["udpUpstreams"] = ingressCfg.UDPUpstreams

@@ -382,12 +382,31 @@ func (ic *GenericController) sync(key interface{}) error {
 	ings := ic.ingLister.Store.List()
 	upstreams, servers := ic.getUpstreamServers(ings)
 
+	var passUpstreams []*ingress.SSLPassthroughUpstreams
+	for _, server := range servers {
+		if !server.SSPassthrough {
+			continue
+		}
+
+		for _, loc := range server.Locations {
+			if loc.Path != rootLocation {
+				continue
+			}
+			passUpstreams = append(passUpstreams, &ingress.SSLPassthroughUpstreams{
+				Upstream: loc.Upstream,
+				Host:     server.Name,
+			})
+			break
+		}
+	}
+
 	data, err := ic.cfg.Backend.OnUpdate(cfg, ingress.Configuration{
-		HealthzURL:   ic.cfg.DefaultHealthzURL,
-		Upstreams:    upstreams,
-		Servers:      servers,
-		TCPUpstreams: ic.getTCPServices(),
-		UDPUpstreams: ic.getUDPServices(),
+		HealthzURL:           ic.cfg.DefaultHealthzURL,
+		Upstreams:            upstreams,
+		Servers:              servers,
+		TCPUpstreams:         ic.getTCPServices(),
+		UDPUpstreams:         ic.getUDPServices(),
+		PassthroughUpstreams: passUpstreams,
 	})
 	if err != nil {
 		return err
