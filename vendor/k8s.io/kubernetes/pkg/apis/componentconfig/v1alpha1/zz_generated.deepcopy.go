@@ -257,11 +257,13 @@ func DeepCopy_v1alpha1_KubeletConfiguration(in interface{}, out interface{}, c *
 		} else {
 			out.CgroupsPerQOS = nil
 		}
+		out.CgroupDriver = in.CgroupDriver
 		out.ContainerRuntime = in.ContainerRuntime
 		out.RemoteRuntimeEndpoint = in.RemoteRuntimeEndpoint
 		out.RemoteImageEndpoint = in.RemoteImageEndpoint
 		out.RuntimeRequestTimeout = in.RuntimeRequestTimeout
 		out.RktPath = in.RktPath
+		out.MounterPath = in.MounterPath
 		out.RktAPIEndpoint = in.RktAPIEndpoint
 		out.RktStage1Image = in.RktStage1Image
 		if in.LockFilePath != nil {
@@ -272,13 +274,6 @@ func DeepCopy_v1alpha1_KubeletConfiguration(in interface{}, out interface{}, c *
 			out.LockFilePath = nil
 		}
 		out.ExitOnLockContention = in.ExitOnLockContention
-		if in.ConfigureCBR0 != nil {
-			in, out := &in.ConfigureCBR0, &out.ConfigureCBR0
-			*out = new(bool)
-			**out = **in
-		} else {
-			out.ConfigureCBR0 = nil
-		}
 		out.HairpinMode = in.HairpinMode
 		out.BabysitDaemons = in.BabysitDaemons
 		out.MaxPods = in.MaxPods
@@ -331,7 +326,6 @@ func DeepCopy_v1alpha1_KubeletConfiguration(in interface{}, out interface{}, c *
 		} else {
 			out.SerializeImagePulls = nil
 		}
-		out.ExperimentalFlannelOverlay = in.ExperimentalFlannelOverlay
 		out.OutOfDiskTransitionFrequency = in.OutOfDiskTransitionFrequency
 		out.NodeIP = in.NodeIP
 		if in.NodeLabels != nil {
@@ -412,6 +406,7 @@ func DeepCopy_v1alpha1_KubeletConfiguration(in interface{}, out interface{}, c *
 		} else {
 			out.AllowedUnsafeSysctls = nil
 		}
+		out.ExperimentalRuntimeIntegrationType = in.ExperimentalRuntimeIntegrationType
 		return nil
 	}
 }

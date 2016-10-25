@@ -24,6 +24,7 @@ import (
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
 	discovery "k8s.io/kubernetes/pkg/client/typed/discovery"
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
+	_ "k8s.io/kubernetes/plugin/pkg/client/auth"
 )
 
 type Interface interface {
@@ -113,7 +114,7 @@ func NewForConfigOrDie(c *restclient.Config) *Clientset {
 }
 
 // New creates a new Clientset for the given RESTClient.
-func New(c *restclient.RESTClient) *Clientset {
+func New(c restclient.Interface) *Clientset {
 	var clientset Clientset
 	clientset.FederationClient = unversionedfederation.New(c)
 	clientset.CoreClient = unversionedcore.New(c)
