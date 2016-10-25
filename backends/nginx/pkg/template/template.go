@@ -85,9 +85,9 @@ func (t *Template) Write(conf map[string]interface{},
 	buffer := new(bytes.Buffer)
 	err := t.tmpl.Execute(buffer, conf)
 
-	// cat -s squeezes multiple adjacent empty lines to be single
+	// squeezes multiple adjacent empty lines to be single
 	// spaced this is to avoid the use of regular expressions
-	cmd := exec.Command("cat", "-s")
+	cmd := exec.Command("/ingress-controller/clean-nginx-conf.sh")
 	cmd.Stdin = buffer
 	var out bytes.Buffer
 	cmd.Stdout = &out

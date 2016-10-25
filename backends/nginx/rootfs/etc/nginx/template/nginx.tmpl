@@ -183,7 +183,7 @@ http {
     {{ range $zone := (buildRateLimitZones .servers) }}
     {{ $zone }}
     {{ end }}
-    
+
     {{ range $server := .servers }}
     server {
         server_name {{ $server.Name }};
@@ -325,6 +325,7 @@ http {
         {{ end }}
         {{ template "CUSTOM_ERRORS" $cfg }}
     }
+	
     {{ end }}
     
     # default server, used for NGINX healthcheck and access to nginx stats
