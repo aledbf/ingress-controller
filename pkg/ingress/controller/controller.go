@@ -384,7 +384,7 @@ func (ic *GenericController) sync(key interface{}) error {
 
 	var passUpstreams []*ingress.SSLPassthroughUpstreams
 	for _, server := range servers {
-		if !server.SSPassthrough {
+		if !server.SSLPassthrough {
 			continue
 		}
 
@@ -892,7 +892,7 @@ func (ic *GenericController) createServers(data []interface{}, upstreams map[str
 			if _, ok := servers[host]; ok {
 				continue
 			}
-			servers[host] = &ingress.Server{Name: host, Locations: locs, SSPassthrough: sslpt}
+			servers[host] = &ingress.Server{Name: host, Locations: locs, SSLPassthrough: sslpt}
 		}
 	}
 

@@ -133,7 +133,7 @@ type Server struct {
 	SSLCertificate    string
 	SSLCertificateKey string
 	SSLPemChecksum    string
-	SSPassthrough     bool
+	SSLPassthrough    bool
 }
 
 // Location describes a server location
