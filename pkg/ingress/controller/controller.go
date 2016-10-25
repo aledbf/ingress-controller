@@ -161,14 +161,10 @@ func newIngressController(config *Configuration) Interface {
 
 	ic.syncQueue = task.NewTaskQueue(ic.sync)
 	ic.secretQueue = task.NewTaskQueue(ic.syncSecret)
-	ic.syncStatus = status.NewStatusSyncer(status.Config{
-		Client:         config.Client,
-		ElectionClient: ic.cfg.ElectionClient,
-		PublishService: ic.cfg.PublishService,
-		IngressLister:  ic.ingLister,
-	})
 
-	// boilerplate code required to watch Ingress, Secrets, ConfigMaps and Endoints
+	// from here to the end of the method all the code is just boilerplate
+	// required to watch Ingress, Secrets, ConfigMaps and Endoints.
+	// This is used to detect new content, updates or removals and act accordingly
 	ingEventHandler := cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			addIng := obj.(*extensions.Ingress)
@@ -304,6 +300,13 @@ func newIngressController(config *Configuration) Interface {
 			},
 		},
 		&api.ConfigMap{}, ic.cfg.ResyncPeriod, mapEventHandler)
+
+	ic.syncStatus = status.NewStatusSyncer(status.Config{
+		Client:         config.Client,
+		ElectionClient: ic.cfg.ElectionClient,
+		PublishService: ic.cfg.PublishService,
+		IngressLister:  ic.ingLister,
+	})
 
 	return ic
 }
