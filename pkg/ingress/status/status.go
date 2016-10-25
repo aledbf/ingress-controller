@@ -173,7 +173,8 @@ func NewStatusSyncer(config Config) Sync {
 	st.syncQueue = task.NewCustomTaskQueue(st.sync, st.keyfunc)
 
 	le, err := NewElection("ingress-controller-leader",
-		pod.Name, pod.Namespace, 30*time.Second, st.callback, config.Client)
+		pod.Name, pod.Namespace, 30*time.Second,
+		st.callback, config.Client, config.ElectionClient)
 	if err != nil {
 		glog.Fatalf("unexpected error starting leader election: %v", err)
 	}

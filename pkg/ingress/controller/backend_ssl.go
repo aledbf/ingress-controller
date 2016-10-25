@@ -61,9 +61,6 @@ func (ic *GenericController) syncSecret(k interface{}) error {
 		}
 		cert.Name = defServerName
 		cert.Namespace = api.NamespaceDefault
-		cert.Kind = "SSLCert"
-		cert.APIVersion = "v1"
-
 		ic.sslCertTracker.Add(key, cert)
 	}
 

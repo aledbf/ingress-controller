@@ -258,7 +258,7 @@ func newIngressController(config *Configuration) IController {
 		},
 		&api.Endpoints{}, ic.cfg.ResyncPeriod, eventHandler)
 
-	ic.svcLister.Store, ic.svcController = cache.NewInformer(
+	ic.svcLister.Indexer, ic.svcController = cache.NewIndexerInformer(
 		&cache.ListWatch{
 			ListFunc: func(opts api.ListOptions) (runtime.Object, error) {
 				return ic.cfg.Client.Services(ic.cfg.Namespace).List(opts)
@@ -267,7 +267,10 @@ func newIngressController(config *Configuration) IController {
 				return ic.cfg.Client.Services(ic.cfg.Namespace).Watch(options)
 			},
 		},
-		&api.Service{}, ic.cfg.ResyncPeriod, cache.ResourceEventHandlerFuncs{})
+		&api.Service{},
+		ic.cfg.ResyncPeriod,
+		cache.ResourceEventHandlerFuncs{},
+		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 
 	ic.secrLister.Store, ic.secrController = cache.NewInformer(
 		&cache.ListWatch{
@@ -468,7 +471,7 @@ func (ic *GenericController) getStreamServices(data map[string]string, proto api
 			continue
 		}
 
-		svcObj, svcExists, err := ic.svcLister.Store.GetByKey(nsName)
+		svcObj, svcExists, err := ic.svcLister.Indexer.GetByKey(nsName)
 		if err != nil {
 			glog.Warningf("error getting service %v: %v", nsName, err)
 			continue
@@ -527,7 +530,7 @@ func (ic *GenericController) getDefaultUpstream() *ingress.Upstream {
 		Name: defUpstreamName,
 	}
 	svcKey := ic.cfg.DefaultService
-	svcObj, svcExists, err := ic.svcLister.Store.GetByKey(svcKey)
+	svcObj, svcExists, err := ic.svcLister.Indexer.GetByKey(svcKey)
 	if err != nil {
 		glog.Warningf("unexpected error searching the default backend %v: %v", ic.cfg.DefaultService, err)
 		upstream.Backends = append(upstream.Backends, newDefaultServer())
@@ -798,7 +801,7 @@ func (ic *GenericController) createUpstreams(data []interface{}) map[string]*ing
 // to a service.
 func (ic *GenericController) serviceEndpoints(svcKey, backendPort string,
 	hz *healthcheck.Upstream) ([]ingress.UpstreamServer, error) {
-	svcObj, svcExists, err := ic.svcLister.Store.GetByKey(svcKey)
+	svcObj, svcExists, err := ic.svcLister.Indexer.GetByKey(svcKey)
 
 	var upstreams []ingress.UpstreamServer
 	if err != nil {
