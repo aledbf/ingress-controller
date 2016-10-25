@@ -9,12 +9,16 @@ This project contains the boilerplate to spin up an Ingress controller.
 
 See [Ingress controller documentation](https://github.com/kubernetes/contrib/blob/master/ingress/controllers/README.md) for details on how it works.
 
+## DONE:
+  - SSL pass through
+  - avoid unnecessary overwrite of ssl certificates
+  - [Interface](https://github.com/aledbf/ingress-controller/blob/master/pkg/ingress/types.go#L40)
+  
 ## TODO:
   - api docs
   - example
   - used directories
-  - avoid unnecessary overwrite of ssl certificates
   - on shutdown remove status IP
   - finish [first implementation](https://github.com/aledbf/ingress-controller/tree/master/backends/nginx) (nginx)
   - add ingress uuid (allow to group multiple controller in the same namespace - this is required to update the status IP in the leader)
-  - secrReferenced
+  - 
