@@ -85,7 +85,7 @@ type NGINXController struct {
 
 // Start ...
 func (n NGINXController) Start() {
-	glog.Info("Starting NGINX process...")
+	glog.Info("starting NGINX process...")
 	cmd := exec.Command(n.binary, "-c", cfgPath)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr

@@ -33,6 +33,7 @@ import (
 )
 
 const (
+	// DefaultSSLDirectory defines the location where the SSL certificates will be generated
 	DefaultSSLDirectory = "/ingress-controller/ssl"
 )
 
