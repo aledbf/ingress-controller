@@ -73,12 +73,6 @@ type statusSync struct {
 	runLock *sync.Mutex
 }
 
-// dummyObject is used as a helper to interact with the
-// workqueue without real Kubernetes API Objects
-type dummyObject struct {
-	api.ObjectMeta
-}
-
 // Run starts the loop to keep the status in sync
 func (s statusSync) Run(stopCh <-chan struct{}) {
 	go wait.Forever(s.elector.Run, 0)
@@ -122,12 +116,7 @@ func (s *statusSync) run() {
 			return true, nil
 		}
 		// send a dummy object to the queue to force a sync
-		s.syncQueue.Enqueue(&dummyObject{
-			ObjectMeta: api.ObjectMeta{
-				Name:      "default",
-				Namespace: "dummy",
-			},
-		})
+		s.syncQueue.Enqueue("dummy")
 		return false, nil
 	})
 	if err != nil {
@@ -165,6 +154,10 @@ func (s *statusSync) callback(leader string) {
 	}
 }
 
+func (s statusSync) keyfunc(input interface{}) (interface{}, error) {
+	return input, nil
+}
+
 // NewStatusSyncer returns a new Sync instance
 func NewStatusSyncer(config Config) Sync {
 	pod, err := k8s.GetPodDetails(config.Client)
@@ -177,7 +170,7 @@ func NewStatusSyncer(config Config) Sync {
 		runLock: &sync.Mutex{},
 		Config:  config,
 	}
-	st.syncQueue = task.NewTaskQueue(st.sync)
+	st.syncQueue = task.NewCustomTaskQueue(st.sync, st.keyfunc)
 
 	le, err := NewElection("ingress-controller-leader",
 		pod.Name, pod.Namespace, 30*time.Second,

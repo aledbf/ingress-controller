@@ -171,6 +171,7 @@ var standardResources = sets.NewString(
 	string(ResourceConfigMaps),
 	string(ResourcePersistentVolumeClaims),
 	string(ResourceStorage),
+	string(ResourceRequestsStorage),
 )
 
 // IsStandardResourceName returns true if the resource is known to the system
@@ -416,7 +417,7 @@ func NodeSelectorRequirementsAsSelector(nsm []NodeSelectorRequirement) (labels.S
 		default:
 			return nil, fmt.Errorf("%q is not a valid node selector operator", expr.Operator)
 		}
-		r, err := labels.NewRequirement(expr.Key, op, sets.NewString(expr.Values...))
+		r, err := labels.NewRequirement(expr.Key, op, expr.Values)
 		if err != nil {
 			return nil, err
 		}

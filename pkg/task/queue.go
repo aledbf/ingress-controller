@@ -41,7 +41,7 @@ type Queue struct {
 	// workerDone is closed when the worker exits
 	workerDone chan struct{}
 
-	fn func(interface{}) (string, error)
+	fn func(obj interface{}) (interface{}, error)
 }
 
 // Run ...
@@ -60,11 +60,7 @@ func (t *Queue) Enqueue(obj interface{}) {
 	t.queue.Add(key)
 }
 
-func (t *Queue) requeue(key interface{}) {
-	t.queue.AddRateLimited(key)
-}
-
-func (t *Queue) defaultKeyFunc(obj interface{}) (string, error) {
+func (t *Queue) defaultKeyFunc(obj interface{}) (interface{}, error) {
 	key, err := keyFunc(obj)
 	if err != nil {
 		return "", fmt.Errorf("could not get key for object %+v: %v", obj, err)
@@ -76,16 +72,15 @@ func (t *Queue) defaultKeyFunc(obj interface{}) (string, error) {
 // worker processes work in the queue through sync.
 func (t *Queue) worker() {
 	for {
-		k, quit := t.queue.Get()
+		key, quit := t.queue.Get()
 		if quit {
 			close(t.workerDone)
 			return
 		}
-		key := k.(string)
 		glog.V(3).Infof("syncing %v", key)
 		if err := t.sync(key); err != nil {
 			glog.Warningf("requeuing %v, err %v", key, err)
-			t.requeue(key)
+			t.queue.AddRateLimited(key)
 		} else {
 			t.queue.Forget(key)
 		}
@@ -112,7 +107,7 @@ func NewTaskQueue(syncFn func(interface{}) error) *Queue {
 }
 
 // NewCustomTaskQueue ...
-func NewCustomTaskQueue(syncFn func(interface{}) error, fn func(interface{}) (string, error)) *Queue {
+func NewCustomTaskQueue(syncFn func(interface{}) error, fn func(interface{}) (interface{}, error)) *Queue {
 	q := &Queue{
 		queue:      workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter()),
 		sync:       syncFn,

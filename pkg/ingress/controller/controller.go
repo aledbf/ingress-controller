@@ -104,8 +104,7 @@ type GenericController struct {
 	syncStatus status.Sync
 
 	// controller for SSL certificates
-	secretController *cache.Controller
-	secretLister     cache_store.StoreToSSLCertLister
+	sslCertTracker *sslCertTracker
 	// TaskQueue in charge of keep the secrets referenced from Ingress
 	// in sync with the files on disk
 	secretQueue *task.Queue
@@ -156,6 +155,9 @@ func newIngressController(config *Configuration) IController {
 		}),
 	}
 
+	ic.syncQueue = task.NewTaskQueue(ic.sync)
+	ic.secretQueue = task.NewTaskQueue(ic.syncSecret)
+
 	ingEventHandler := cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			addIng := obj.(*extensions.Ingress)
@@ -191,14 +193,17 @@ func newIngressController(config *Configuration) IController {
 
 	secrEventHandler := cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
-			ic.secretQueue.Enqueue(obj)
+			sec := obj.(*api.Secret)
+			ic.secretQueue.Enqueue(sec)
 		},
 		DeleteFunc: func(obj interface{}) {
-			ic.secretQueue.Enqueue(obj)
+			sec := obj.(*api.Secret)
+			ic.sslCertTracker.Delete(fmt.Sprintf("%v/%v", sec.Namespace, sec.Name))
 		},
 		UpdateFunc: func(old, cur interface{}) {
 			if !reflect.DeepEqual(old, cur) {
-				ic.secretQueue.Enqueue(cur)
+				sec := cur.(*api.Secret)
+				ic.secretQueue.Enqueue(sec)
 			}
 		},
 	}
@@ -289,12 +294,7 @@ func newIngressController(config *Configuration) IController {
 		},
 		&api.ConfigMap{}, ic.cfg.ResyncPeriod, mapEventHandler)
 
-	ic.secretLister.Store, ic.secretController = cache.NewInformer(
-		&cache.ListWatch{},
-		&ingress.SSLCert{},
-		ic.cfg.ResyncPeriod,
-		cache.ResourceEventHandlerFuncs{},
-	)
+	ic.sslCertTracker = newSSLCertTracker()
 
 	ic.syncStatus = status.NewStatusSyncer(status.Config{
 		Client:         config.Client,
@@ -302,10 +302,6 @@ func newIngressController(config *Configuration) IController {
 		PublishService: ic.cfg.PublishService,
 		IngressLister:  ic.ingLister,
 	})
-
-	ic.syncQueue = task.NewTaskQueue(ic.sync)
-
-	ic.secretQueue = task.NewTaskQueue(ic.syncSecret)
 
 	return ic
 }
@@ -336,6 +332,7 @@ func (ic GenericController) Check(_ *http.Request) error {
 	return nil
 }
 
+// getSecret searchs for a secret in the local secrets Store
 func (ic *GenericController) getSecret(name string) (*api.Secret, error) {
 	s, exists, err := ic.secrLister.Store.GetByKey(name)
 	if err != nil {
@@ -733,11 +730,7 @@ func (ic *GenericController) getUpstreamServers(data []interface{}) ([]*ingress.
 }
 
 func (ic *GenericController) getAuthCertificate(secretName string) (*authtls.SSLCert, error) {
-	bc, exists, err := ic.secretLister.GetByKey(secretName)
-	if err != nil {
-		return nil, err
-	}
-
+	bc, exists := ic.sslCertTracker.Get(secretName)
 	if !exists {
 		return nil, fmt.Errorf("service %v does not exists", secretName)
 	}
@@ -859,6 +852,13 @@ func (ic *GenericController) createServers(data []interface{}, upstreams map[str
 	for _, ingIf := range data {
 		ing := ingIf.(*extensions.Ingress)
 
+		// check if ssl passthrough is configured
+		sslpt, err := sslpassthrough.ParseAnnotations(upsDefaults, ing)
+		glog.V(5).Infof("ssl passthrough annotation: %v", sslpt)
+		if err != nil {
+			glog.V(3).Infof("error reading ssl passthrough annotation in Ingress %v/%v: %v", ing.GetNamespace(), ing.GetName(), err)
+		}
+
 		for _, rule := range ing.Spec.Rules {
 			host := rule.Host
 			if host == "" {
@@ -867,48 +867,41 @@ func (ic *GenericController) createServers(data []interface{}, upstreams map[str
 
 			if _, ok := servers[host]; ok {
 				glog.V(3).Infof("rule %v/%v uses a host already defined. Skipping server creation", ing.GetNamespace(), ing.GetName())
-			} else {
-				locs := []*ingress.Location{}
-				loc := &ingress.Location{
-					Path:         rootLocation,
-					IsDefBackend: true,
-					Upstream:     *ic.getDefaultUpstream(),
-					Proxy:        ngxProxy,
-				}
+				continue
+			}
+			locs := []*ingress.Location{}
+			loc := &ingress.Location{
+				Path:         rootLocation,
+				IsDefBackend: true,
+				Upstream:     *ic.getDefaultUpstream(),
+				Proxy:        ngxProxy,
+			}
 
-				if ing.Spec.Backend != nil {
-					defUpstream := fmt.Sprintf("default-backend-%v-%v-%v", ing.GetNamespace(), ing.Spec.Backend.ServiceName, ing.Spec.Backend.ServicePort.String())
-					if backendUpstream, ok := upstreams[defUpstream]; ok {
-						if host == "" || host == defServerName {
-							ic.recorder.Eventf(ing, api.EventTypeWarning, "MAPPING", "error: rules with Spec.Backend are allowed with hostnames")
-						} else {
-							loc.Upstream = *backendUpstream
-						}
+			if ing.Spec.Backend != nil {
+				defUpstream := fmt.Sprintf("default-backend-%v-%v-%v", ing.GetNamespace(), ing.Spec.Backend.ServiceName, ing.Spec.Backend.ServicePort.String())
+				if backendUpstream, ok := upstreams[defUpstream]; ok {
+					if host == "" || host == defServerName {
+						ic.recorder.Eventf(ing, api.EventTypeWarning, "MAPPING", "error: rules with Spec.Backend are allowed with hostnames")
+					} else {
+						loc.Upstream = *backendUpstream
 					}
 				}
-
-				locs = append(locs, loc)
-				servers[host] = &ingress.Server{Name: host, Locations: locs}
 			}
 
-			sslpt, err := sslpassthrough.ParseAnnotations(upsDefaults, ing)
-			glog.V(5).Infof("ssl passthrough annotation: %v", sslpt)
-			if err != nil {
-				glog.V(3).Infof("error reading ssl passthrough annotation in Ingress %v/%v: %v", ing.GetNamespace(), ing.GetName(), err)
-			}
-			if sslpt {
-				server := servers[host]
-				server.SSPassthrough = true
-			}
+			locs = append(locs, loc)
+			servers[host] = &ingress.Server{Name: host, Locations: locs, SSPassthrough: sslpt}
 
-			bc, exists, _ := ic.secretLister.GetByKey(host)
-			if exists {
-				cert := bc.(*ingress.SSLCert)
-				server := servers[host]
-				server.SSL = true
-				server.SSLCertificate = cert.PemFileName
-				server.SSLCertificateKey = cert.PemFileName
-				server.SSLPemChecksum = cert.PemSHA
+			if len(ing.Spec.TLS) > 0 {
+				key := fmt.Sprintf("%v/%v", ing.Namespace, ing.Spec.TLS[0].SecretName)
+				bc, exists := ic.sslCertTracker.Get(key)
+				if exists {
+					cert := bc.(*ingress.SSLCert)
+					server := servers[host]
+					server.SSL = true
+					server.SSLCertificate = cert.PemFileName
+					server.SSLCertificateKey = cert.PemFileName
+					server.SSLPemChecksum = cert.PemSHA
+				}
 			}
 		}
 	}
@@ -949,18 +942,19 @@ func (ic *GenericController) getEndpoints(
 				port, err := service.GetPortMapping(servicePort.StrVal, s)
 				if err == nil {
 					targetPort = port
-				} else {
-					glog.Warningf("error mapping service port: %v", err)
-					err := ic.checkSvcForUpdate(s)
-					if err != nil {
-						glog.Warningf("error mapping service ports: %v", err)
-						continue
-					}
+					continue
+				}
 
-					port, err := service.GetPortMapping(servicePort.StrVal, s)
-					if err == nil {
-						targetPort = port
-					}
+				glog.Warningf("error mapping service port: %v", err)
+				err = ic.checkSvcForUpdate(s)
+				if err != nil {
+					glog.Warningf("error mapping service ports: %v", err)
+					continue
+				}
+
+				port, err = service.GetPortMapping(servicePort.StrVal, s)
+				if err == nil {
+					targetPort = port
 				}
 			}
 
@@ -1013,8 +1007,8 @@ func (ic GenericController) Start() {
 	go ic.secrController.Run(ic.stopCh)
 	go ic.mapController.Run(ic.stopCh)
 
-	go ic.syncQueue.Run(time.Second, ic.stopCh)
 	go ic.secretQueue.Run(time.Second, ic.stopCh)
+	go ic.syncQueue.Run(time.Second, ic.stopCh)
 
 	go ic.syncStatus.Run(ic.stopCh)
 

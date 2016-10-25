@@ -18,7 +18,7 @@ PKG := "github.com/aledbf/ingress-controller/backends/nginx"
 build: clean
 	CGO_ENABLED=0 GOOS=${GOOS} go build -a -installsuffix cgo \
 		-ldflags "-s -w -X ${PKG}/pkg/version.RELEASE=${RELEASE} -X ${PKG}/pkg/version.COMMIT=${COMMIT} -X ${PKG}/pkg/version.REPO=${REPO_INFO}" \
-		-o rootfs/nginx-ingress-controller ${PKG}/pkg/cmd/controller 
+		-o rootfs/ingress-controller/nginx ${PKG}/pkg/cmd/controller
 
 container: build
 	docker build -t $(PREFIX):$(RELEASE) rootfs

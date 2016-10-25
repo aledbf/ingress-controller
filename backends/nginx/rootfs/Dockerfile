@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM quay.io/aledbf/nginx-slim:0.10
+FROM quay.io/aledbf/nginx-slim:0.11
 
 RUN DEBIAN_FRONTEND=noninteractive apt-get update && apt-get install -y \
   diffutils \
@@ -23,6 +23,4 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get update && apt-get install -y \
 
 COPY . /
 
-RUN mkdir -p /ingress-controller/ssl
-
-CMD ["/nginx-ingress-controller"]
+CMD ["/ingress-controller/nginx"]
