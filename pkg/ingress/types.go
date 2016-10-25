@@ -33,6 +33,7 @@ import (
 )
 
 const (
+	// DefaultSSLDirectory defines the location where the SSL certificates will be generated
 	DefaultSSLDirectory = "/ingress-controller/ssl"
 )
 
@@ -78,11 +79,12 @@ type Controller interface {
 
 // Configuration describes
 type Configuration struct {
-	HealthzURL   string
-	Upstreams    []*Upstream
-	Servers      []*Server
-	TCPUpstreams []*Location
-	UDPUpstreams []*Location
+	HealthzURL           string
+	Upstreams            []*Upstream
+	Servers              []*Server
+	TCPUpstreams         []*Location
+	UDPUpstreams         []*Location
+	PassthroughUpstreams []*SSLPassthroughUpstreams
 }
 
 // Upstream describes an upstream server (endpoint)
@@ -94,6 +96,12 @@ type Upstream struct {
 	Backends []UpstreamServer
 	// Secure indicates if the communication with the en
 	Secure bool
+}
+
+type SSLPassthroughUpstreams struct {
+	Upstream
+
+	Host string
 }
 
 // UpstreamByNameServers sorts upstreams by name
@@ -125,7 +133,7 @@ type Server struct {
 	SSLCertificate    string
 	SSLCertificateKey string
 	SSLPemChecksum    string
-	SSPassthrough     bool
+	SSLPassthrough    bool
 }
 
 // Location describes a server location

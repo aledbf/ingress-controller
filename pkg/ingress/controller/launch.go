@@ -24,7 +24,7 @@ import (
 )
 
 // NewIngressController returns a configured Ingress controller ready to start
-func NewIngressController(backend ingress.Controller) IController {
+func NewIngressController(backend ingress.Controller) Interface {
 	var (
 		flags = pflag.NewFlagSet("", pflag.ExitOnError)
 
@@ -157,7 +157,7 @@ func NewIngressController(backend ingress.Controller) IController {
 	return ic
 }
 
-func registerHandlers(enableProfiling bool, port int, ic IController) {
+func registerHandlers(enableProfiling bool, port int, ic Interface) {
 	mux := http.NewServeMux()
 	healthz.InstallHandler(mux, ic)
 

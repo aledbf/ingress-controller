@@ -32,9 +32,3 @@ type StoreToSecretsLister struct {
 type StoreToConfigmapLister struct {
 	cache.Store
 }
-
-// StoreToSSLCertLister make s Store that lists SSL certificates
-// used in Ingress rules
-type StoreToSSLCertLister struct {
-	cache.Store
-}

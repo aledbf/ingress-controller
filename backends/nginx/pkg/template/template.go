@@ -21,6 +21,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"os/exec"
 	"regexp"
 	"strings"
 	text_template "text/template"
@@ -36,8 +37,7 @@ const (
 )
 
 var (
-	camelRegexp        = regexp.MustCompile("[0-9A-Za-z]+")
-	multipleBlankLines = regexp.MustCompile("(\\s{5,}\n|\n){2,}")
+	camelRegexp = regexp.MustCompile("[0-9A-Za-z]+")
 )
 
 // Template ...
@@ -84,13 +84,19 @@ func (t *Template) Write(conf map[string]interface{},
 
 	buffer := new(bytes.Buffer)
 	err := t.tmpl.Execute(buffer, conf)
-	//
-	content := multipleBlankLines.ReplaceAllLiteral(buffer.Bytes(), []byte("\n\n"))
-	if err != nil {
-		glog.V(3).Infof("%v", string(content))
-		return nil, err
+
+	// squeezes multiple adjacent empty lines to be single
+	// spaced this is to avoid the use of regular expressions
+	cmd := exec.Command("/ingress-controller/clean-nginx-conf.sh")
+	cmd.Stdin = buffer
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	if err := cmd.Run(); err != nil {
+		glog.Warningf("unexpected error cleaning template: %v", err)
+		return buffer.Bytes(), nil
 	}
 
+	content := out.Bytes()
 	err = isValidTemplate(content)
 	if err != nil {
 		return nil, err
@@ -108,11 +114,12 @@ var (
 			}
 			return true
 		},
-		"buildLocation":       buildLocation,
-		"buildAuthLocation":   buildAuthLocation,
-		"buildProxyPass":      buildProxyPass,
-		"buildRateLimitZones": buildRateLimitZones,
-		"buildRateLimit":      buildRateLimit,
+		"buildLocation":            buildLocation,
+		"buildAuthLocation":        buildAuthLocation,
+		"buildProxyPass":           buildProxyPass,
+		"buildRateLimitZones":      buildRateLimitZones,
+		"buildRateLimit":           buildRateLimit,
+		"getSSPassthroughUpstream": getSSPassthroughUpstream,
 
 		"contains":  strings.Contains,
 		"hasPrefix": strings.HasPrefix,
@@ -121,6 +128,15 @@ var (
 		"toLower":   strings.ToLower,
 	}
 )
+
+func getSSPassthroughUpstream(input interface{}) string {
+	s, ok := input.(*ingress.Server)
+	if !ok {
+		return ""
+	}
+
+	return s.Name
+}
 
 // buildLocation produces the location string, if the ingress has redirects
 // (specified through the ingress.kubernetes.io/rewrite-to annotation)

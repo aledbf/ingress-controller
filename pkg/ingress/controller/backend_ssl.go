@@ -76,7 +76,7 @@ func (ic *GenericController) syncSecret(k interface{}) error {
 	}
 	sec := secObj.(*api.Secret)
 	if !ic.secrReferenced(sec.Name, sec.Namespace) {
-		glog.V(2).Infof("secret %v/%v is not used in Ingress rules. Skipping ", sec.Namespace, sec.Name)
+		glog.V(5).Infof("secret %v/%v is not used in Ingress rules. Skipping ", sec.Namespace, sec.Name)
 		return nil
 	}
 

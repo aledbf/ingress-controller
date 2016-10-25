@@ -183,7 +183,7 @@ http {
     {{ range $zone := (buildRateLimitZones .servers) }}
     {{ $zone }}
     {{ end }}
-    
+
     {{ range $server := .servers }}
     server {
         server_name {{ $server.Name }};
@@ -325,6 +325,7 @@ http {
         {{ end }}
         {{ template "CUSTOM_ERRORS" $cfg }}
     }
+	
     {{ end }}
     
     # default server, used for NGINX healthcheck and access to nginx stats
@@ -376,15 +377,24 @@ http {
 stream {
     # map FQDN that requires SSL passthrough
     map $ssl_preread_server_name $name {
-        # backend.example.com      backend;
         # send SSL traffic to this nginx in a different port 
         default                  nginx-ssl-backend;
+        {{ range $name, $passthrough := .passthroughUpstreams }}
+        {{ $passthrough.Host }} {{  $passthrough.Upstream.Name }}-pt;
+        {{ end }}
     }
 
     # configure default backend for SSL
     upstream nginx-ssl-backend {
         server 127.0.0.1:442;
     }
+
+    {{range $name, $passthrough := .passthroughUpstreams }}
+    upstream {{$passthrough.Name}}-pt {
+        {{ range $server := $passthrough.Backends }}server {{ $server.Address }}:{{ $server.Port }};
+        {{ end }}
+    }
+    {{ end }}
 
     server {
         listen                  443;
