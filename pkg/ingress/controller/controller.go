@@ -71,8 +71,8 @@ const (
 	ingressClassKey = "kubernetes.io/ingress.class"
 )
 
-// IController ...
-type IController interface {
+// Interface holds the methods to handle an Ingress backend
+type Interface interface {
 	Start()
 	Stop() error
 
@@ -119,27 +119,30 @@ type GenericController struct {
 	stopCh chan struct{}
 }
 
-// Configuration ...
+// Configuration contains all the settings required by an Ingress controller
 type Configuration struct {
 	Client         *client.Client
 	ElectionClient *clientset.Clientset
 
-	ResyncPeriod          time.Duration
-	DefaultService        string
-	IngressClass          string
-	Namespace             string
-	ConfigMapName         string
-	TCPConfigMapName      string
+	ResyncPeriod   time.Duration
+	DefaultService string
+	IngressClass   string
+	Namespace      string
+	ConfigMapName  string
+	// optional
+	TCPConfigMapName string
+	// optional
 	UDPConfigMapName      string
 	DefaultSSLCertificate string
 	DefaultHealthzURL     string
-	PublishService        string
+	// optional
+	PublishService string
 
 	Backend ingress.Controller
 }
 
 // newIngressController creates an Ingress controller
-func newIngressController(config *Configuration) IController {
+func newIngressController(config *Configuration) Interface {
 
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
@@ -153,11 +156,19 @@ func newIngressController(config *Configuration) IController {
 		recorder: eventBroadcaster.NewRecorder(api.EventSource{
 			Component: "ingress-controller",
 		}),
+		sslCertTracker: newSSLCertTracker(),
 	}
 
 	ic.syncQueue = task.NewTaskQueue(ic.sync)
 	ic.secretQueue = task.NewTaskQueue(ic.syncSecret)
+	ic.syncStatus = status.NewStatusSyncer(status.Config{
+		Client:         config.Client,
+		ElectionClient: ic.cfg.ElectionClient,
+		PublishService: ic.cfg.PublishService,
+		IngressLister:  ic.ingLister,
+	})
 
+	// boilerplate code required to watch Ingress, Secrets, ConfigMaps and Endoints
 	ingEventHandler := cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			addIng := obj.(*extensions.Ingress)
@@ -293,15 +304,6 @@ func newIngressController(config *Configuration) IController {
 			},
 		},
 		&api.ConfigMap{}, ic.cfg.ResyncPeriod, mapEventHandler)
-
-	ic.sslCertTracker = newSSLCertTracker()
-
-	ic.syncStatus = status.NewStatusSyncer(status.Config{
-		Client:         config.Client,
-		ElectionClient: ic.cfg.ElectionClient,
-		PublishService: ic.cfg.PublishService,
-		IngressLister:  ic.ingLister,
-	})
 
 	return ic
 }
@@ -865,15 +867,14 @@ func (ic *GenericController) createServers(data []interface{}, upstreams map[str
 			if host == "" {
 				host = defServerName
 			}
-
 			if _, ok := servers[host]; ok {
 				continue
 			}
-
 			servers[host] = &ingress.Server{Name: host, Locations: locs, SSPassthrough: sslpt}
 		}
 	}
 
+	// configure default location and SSL
 	for _, ingIf := range data {
 		ing := ingIf.(*extensions.Ingress)
 
@@ -886,8 +887,8 @@ func (ic *GenericController) createServers(data []interface{}, upstreams map[str
 			if len(ing.Spec.TLS) > 0 {
 				key := fmt.Sprintf("%v/%v", ing.Namespace, ing.Spec.TLS[0].SecretName)
 				bc, exists := ic.sslCertTracker.Get(key)
-				if exists {
-					cert := bc.(*ingress.SSLCert)
+				cert := bc.(*ingress.SSLCert)
+				if exists && isHostValid(host, cert) {
 					server := servers[host]
 					server.SSL = true
 					server.SSLCertificate = cert.PemFileName
@@ -896,6 +897,7 @@ func (ic *GenericController) createServers(data []interface{}, upstreams map[str
 				}
 			}
 
+			// server already configured
 			if len(servers[host].Locations) > 0 {
 				continue
 			}
@@ -1007,6 +1009,7 @@ func (ic GenericController) Stop() error {
 		glog.Infof("shutting down controller queues")
 		close(ic.stopCh)
 		go ic.syncQueue.Shutdown()
+		go ic.secretQueue.Shutdown()
 		ic.syncStatus.Shutdown()
 		return nil
 	}
