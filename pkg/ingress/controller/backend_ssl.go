@@ -54,7 +54,7 @@ func (ic *GenericController) syncSecret(k interface{}) error {
 			}
 		} else {
 			defCert, defKey := ssl.GetFakeSSLCert()
-			cert, err = ssl.AddOrUpdateCertAndKey("system-snake-oil-certificate", defCert, defKey, "")
+			cert, err = ssl.AddOrUpdateCertAndKey("system-snake-oil-certificate", defCert, defKey, []byte{})
 			if err != nil {
 				return nil
 			}
@@ -119,7 +119,7 @@ func (ic *GenericController) getPemCertificate(secretName string) (*ingress.SSLC
 	ca := secret.Data["ca.crt"]
 
 	nsSecName := strings.Replace(secretName, "/", "-", -1)
-	s, err := ssl.AddOrUpdateCertAndKey(nsSecName, string(cert), string(key), string(ca))
+	s, err := ssl.AddOrUpdateCertAndKey(nsSecName, cert, key, ca)
 	if err != nil {
 		return nil, err
 	}

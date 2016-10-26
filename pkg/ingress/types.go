@@ -127,13 +127,13 @@ type UpstreamServer struct {
 
 // Server describes a virtual server
 type Server struct {
-	Name              string
-	SSL               bool
-	SSLPassthrough    bool
-	SSLCertificate    string
-	SSLCertificateKey string
-	SSLPemChecksum    string
-	Locations         []*Location
+	Name           string
+	SSL            bool
+	SSLPassthrough bool
+	SSLCertificate string
+	//SSLCertificateKey string
+	SSLPemChecksum string
+	Locations      []*Location
 }
 
 // Location describes a server location
@@ -192,9 +192,9 @@ func (c LocationByPath) Less(i, j int) bool {
 type SSLCert struct {
 	api.ObjectMeta
 
-	CertFileName string
-	KeyFileName  string
-	CAFileName   string
+	//CertFileName string
+	//KeyFileName  string
+	CAFileName string
 
 	// PemFileName contains the path to the file with the certificate and key concatenated
 	PemFileName string

@@ -39,6 +39,7 @@ const (
 type Template struct {
 	tmpl *text_template.Template
 	fw   watch.FileWatcher
+	s    int
 }
 
 //NewTemplate returns a new Template instance or an
@@ -56,6 +57,7 @@ func NewTemplate(file string, onChange func()) (*Template, error) {
 	return &Template{
 		tmpl: tmpl,
 		fw:   fw,
+		s:    65535,
 	}, nil
 }
 
@@ -77,15 +79,20 @@ func (t *Template) Write(conf map[string]interface{},
 		glog.Infof("NGINX configuration: %v", string(b))
 	}
 
-	buffer := new(bytes.Buffer)
+	buffer := bytes.NewBuffer(make([]byte, 0, t.s))
 	err := t.tmpl.Execute(buffer, conf)
+
+	if t.s < buffer.Cap() {
+		glog.V(2).Infof("adjusting template buffer size from %v to %v", t.s, buffer.Cap())
+		t.s = buffer.Cap()
+	}
 
 	// squeezes multiple adjacent empty lines to be single
 	// spaced this is to avoid the use of regular expressions
 	cmd := exec.Command("/ingress-controller/clean-nginx-conf.sh")
 	cmd.Stdin = buffer
-	var out bytes.Buffer
-	cmd.Stdout = &out
+	out := bytes.NewBuffer(make([]byte, 0, t.s))
+	cmd.Stdout = out
 	if err := cmd.Run(); err != nil {
 		glog.Warningf("unexpected error cleaning template: %v", err)
 		return buffer.Bytes(), nil
