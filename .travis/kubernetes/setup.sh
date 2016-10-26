@@ -58,11 +58,10 @@ if [ ! -e ${KUBECTL} ]; then
   chmod u+x ${KUBECTL}
 fi
 
-${KUBECTL} config set-cluster test-doc --server=http://0.0.0.0:8080
-${KUBECTL} config set-context test-doc --cluster=test-doc
-${KUBECTL} config use-context test-doc
+${KUBECTL} config set-cluster travis --server=http://0.0.0.0:8080
+${KUBECTL} config set-context travis --cluster=travis
+${KUBECTL} config use-context travis
 
-# [w]ait [u]ntil [p]ort [i]s [a]ctually [o]pen
 until curl -o /dev/null -sIf http://0.0.0.0:8080; do \
   sleep 5 && echo .;
 done;

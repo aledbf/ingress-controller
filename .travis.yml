@@ -14,7 +14,7 @@ go:
 env:
   global:
   - ETCD_VERSION=3.0.12
-  - K8S_VERSION=1.4.3
+  - K8S_VERSION=1.4.4
 
 before_install:
   - sudo bash -c 'sysctl net.ipv6.conf.all.disable_ipv6=0'
