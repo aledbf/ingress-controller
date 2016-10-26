@@ -376,21 +376,27 @@ http {
 
 stream {
     # map FQDN that requires SSL passthrough
-    map $ssl_preread_server_name $name {
-        # send SSL traffic to this nginx in a different port 
-        default                  nginx-ssl-backend;
-        {{ range $name, $passthrough := .passthroughUpstreams }}
-        {{ $passthrough.Host }} {{  $passthrough.Upstream.Name }}-pt;
+    map $ssl_preread_server_name $stream_upstream {
+        {{ range $i, $passthrough := .passthroughUpstreams }}
+        {{ $passthrough.Host }}         {{  $passthrough.Upstream.Name }}-{{ $i }}-pt;
         {{ end }}
+        # send SSL traffic to this nginx in a different port 
+        default                         nginx-ssl-backend;
     }
+
+    log_format log_stream '$remote_addr [$time_local] $protocol [$ssl_preread_server_name] [$stream_upstream] '
+        '$status $bytes_sent $bytes_received $session_time';
+
+    access_log /var/log/nginx/access.log log_stream;
+    error_log  /var/log/nginx/error.log;
 
     # configure default backend for SSL
     upstream nginx-ssl-backend {
         server 127.0.0.1:442;
     }
 
-    {{range $name, $passthrough := .passthroughUpstreams }}
-    upstream {{$passthrough.Name}}-pt {
+    {{ range $i, $passthrough := .passthroughUpstreams }}
+    upstream {{ $passthrough.Name }}-{{ $i }}-pt {
         {{ range $server := $passthrough.Backends }}server {{ $server.Address }}:{{ $server.Port }};
         {{ end }}
     }
@@ -398,7 +404,7 @@ stream {
 
     server {
         listen                  443;
-        proxy_pass              $name;
+        proxy_pass              $stream_upstream;
         ssl_preread             on;
     }
 

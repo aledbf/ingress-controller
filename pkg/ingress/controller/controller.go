@@ -436,7 +436,7 @@ func (ic *GenericController) getTCPServices() []*ingress.Location {
 	}
 	tcpMap, err := ic.getConfigMap(ns, name)
 	if err != nil {
-		glog.V(3).Infof("no configured tcp services found: %v", err)
+		glog.V(5).Infof("no configured tcp services found: %v", err)
 		return []*ingress.Location{}
 	}
 
@@ -623,7 +623,7 @@ func (ic *GenericController) getUpstreamServers(data []interface{}) ([]*ingress.
 		}
 
 		ra, err := authreq.ParseAnnotations(ing)
-		glog.V(3).Infof("auth request annotation: %v", ra)
+		glog.V(5).Infof("auth request annotation: %v", ra)
 		if err != nil {
 			glog.V(5).Infof("error reading auth request annotation in Ingress %v/%v: %v", ing.GetNamespace(), ing.GetName(), err)
 		}
@@ -634,7 +634,7 @@ func (ic *GenericController) getUpstreamServers(data []interface{}) ([]*ingress.
 		certAuth, err := authtls.ParseAnnotations(ing, ic.getAuthCertificate)
 		glog.V(5).Infof("auth request annotation: %v", certAuth)
 		if err != nil {
-			glog.V(3).Infof("error reading certificate auth annotation in Ingress %v/%v: %v", ing.GetNamespace(), ing.GetName(), err)
+			glog.V(5).Infof("error reading certificate auth annotation in Ingress %v/%v: %v", ing.GetNamespace(), ing.GetName(), err)
 		}
 
 		for _, rule := range ing.Spec.Rules {
@@ -648,7 +648,7 @@ func (ic *GenericController) getUpstreamServers(data []interface{}) ([]*ingress.
 			}
 
 			if rule.HTTP == nil && host != defServerName {
-				// no rules, host is not default server.
+				// no rules and host is not default server
 				// check if Ingress rules contains Backend and replace default backend
 				defBackend := fmt.Sprintf("default-backend-%v-%v-%v", ing.GetNamespace(), ing.Spec.Backend.ServiceName, ing.Spec.Backend.ServicePort.String())
 				ups := upstreams[defBackend]
@@ -670,19 +670,15 @@ func (ic *GenericController) getUpstreamServers(data []interface{}) ([]*ingress.
 					}
 				}
 
-				nginxPath := path.Path
 				// if there's no path defined we assume /
-				// in NGINX / == /*
-				if nginxPath == "" {
-					ic.recorder.Eventf(ing, api.EventTypeWarning, "MAPPING",
-						"Ingress rule '%v/%v' contains no path definition. Assuming /",
-						ing.GetNamespace(), ing.GetName())
-					nginxPath = rootLocation
+				nginxPath := rootLocation
+				if path.Path != "" {
+					nginxPath = path.Path
 				}
 
-				// Validate that there is no previous rule for the same host and path.
 				addLoc := true
 				for _, loc := range server.Locations {
+					// validate that there is no previous rule for / using the default backend
 					if loc.Path == rootLocation && nginxPath == rootLocation && loc.IsDefBackend {
 						loc.Upstream = *ups
 						loc.IsDefBackend = false
@@ -702,13 +698,12 @@ func (ic *GenericController) getUpstreamServers(data []interface{}) ([]*ingress.
 					}
 
 					if loc.Path == nginxPath {
-						ic.recorder.Eventf(ing, api.EventTypeWarning, "MAPPING",
-							"Path '%v' already defined in another Ingress rule", nginxPath)
 						addLoc = false
 						break
 					}
 				}
 
+				// is a new location
 				if addLoc {
 					server.Locations = append(server.Locations, &ingress.Location{
 						Path:            nginxPath,
@@ -794,7 +789,7 @@ func (ic *GenericController) createUpstreams(data []interface{}) map[string]*ing
 		}
 
 		for _, rule := range ing.Spec.Rules {
-			if rule.IngressRuleValue.HTTP == nil {
+			if rule.HTTP == nil {
 				continue
 			}
 
@@ -881,7 +876,7 @@ func (ic *GenericController) createServers(data []interface{}, upstreams map[str
 		sslpt, err := sslpassthrough.ParseAnnotations(upsDefaults, ing)
 		glog.V(5).Infof("ssl passthrough annotation: %v", sslpt)
 		if err != nil {
-			glog.V(3).Infof("error reading ssl passthrough annotation in Ingress %v/%v: %v", ing.GetNamespace(), ing.GetName(), err)
+			glog.V(5).Infof("error reading ssl passthrough annotation in Ingress %v/%v: %v", ing.GetNamespace(), ing.GetName(), err)
 		}
 
 		for _, rule := range ing.Spec.Rules {
@@ -906,45 +901,31 @@ func (ic *GenericController) createServers(data []interface{}, upstreams map[str
 				host = defServerName
 			}
 
-			if len(ing.Spec.TLS) > 0 {
+			// only add certificate if the server does not have one previously configured
+			if len(ing.Spec.TLS) > 0 && !servers[host].SSL {
 				key := fmt.Sprintf("%v/%v", ing.Namespace, ing.Spec.TLS[0].SecretName)
 				bc, exists := ic.sslCertTracker.Get(key)
-				cert := bc.(*ingress.SSLCert)
-				if exists && isHostValid(host, cert) {
-					server := servers[host]
-					server.SSL = true
-					server.SSLCertificate = cert.PemFileName
-					server.SSLCertificateKey = cert.PemFileName
-					server.SSLPemChecksum = cert.PemSHA
+				if exists {
+					cert := bc.(*ingress.SSLCert)
+					if isHostValid(host, cert) {
+						servers[host].SSL = true
+						servers[host].SSLCertificate = cert.PemFileName
+						servers[host].SSLCertificateKey = cert.PemFileName
+						servers[host].SSLPemChecksum = cert.PemSHA
+					}
 				}
-			}
-
-			// server already configured
-			if len(servers[host].Locations) > 0 {
-				continue
-			}
-
-			locs := []*ingress.Location{}
-			loc := &ingress.Location{
-				Path:         rootLocation,
-				IsDefBackend: true,
-				Upstream:     *ic.getDefaultUpstream(),
-				Proxy:        ngxProxy,
 			}
 
 			if ing.Spec.Backend != nil {
 				defUpstream := fmt.Sprintf("default-backend-%v-%v-%v", ing.GetNamespace(), ing.Spec.Backend.ServiceName, ing.Spec.Backend.ServicePort.String())
 				if backendUpstream, ok := upstreams[defUpstream]; ok {
 					if host == "" || host == defServerName {
-						ic.recorder.Eventf(ing, api.EventTypeWarning, "MAPPING", "error: rules with Spec.Backend are allowed with hostnames")
-					} else {
-						loc.Upstream = *backendUpstream
+						ic.recorder.Eventf(ing, api.EventTypeWarning, "MAPPING", "error: rules with Spec.Backend are allowed only with hostnames")
+						continue
 					}
+					servers[host].Locations[0].Upstream = *backendUpstream
 				}
 			}
-
-			locs = append(locs, loc)
-			servers[host].Locations = locs
 		}
 	}
 
