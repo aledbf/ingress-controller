@@ -18,13 +18,11 @@ package ssl
 
 import (
 	"crypto/sha1"
-	"crypto/tls"
 	"crypto/x509"
 	"encoding/hex"
 	"encoding/pem"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"os"
 
 	"github.com/golang/glog"
@@ -33,23 +31,31 @@ import (
 )
 
 // AddOrUpdateCertAndKey creates a .pem file wth the cert and the key with the specified name
-func AddOrUpdateCertAndKey(name string, cert string, key string, ca string) (*ingress.SSLCert, error) {
+func AddOrUpdateCertAndKey(name string, cert, key, ca []byte) (*ingress.SSLCert, error) {
 	pemName := fmt.Sprintf("%v.pem", name)
 	pemFileName := fmt.Sprintf("%v/%v", ingress.DefaultSSLDirectory, pemName)
 
 	tempPemFile, err := ioutil.TempFile("", pemName)
 	if err != nil {
-		return nil, fmt.Errorf("Couldn't create temp pem file %v: %v", tempPemFile.Name(), err)
+		return nil, fmt.Errorf("could not create temp pem file %v: %v", tempPemFile.Name(), err)
 	}
 
-	_, err = tempPemFile.WriteString(fmt.Sprintf("%v\n%v", cert, key))
+	_, err = tempPemFile.Write(cert)
 	if err != nil {
-		return nil, fmt.Errorf("Couldn't write to pem file %v: %v", tempPemFile.Name(), err)
+		return nil, fmt.Errorf("could not write to pem file %v: %v", tempPemFile.Name(), err)
+	}
+	_, err = tempPemFile.Write([]byte("\n"))
+	if err != nil {
+		return nil, fmt.Errorf("could not write to pem file %v: %v", tempPemFile.Name(), err)
+	}
+	_, err = tempPemFile.Write(key)
+	if err != nil {
+		return nil, fmt.Errorf("could not write to pem file %v: %v", tempPemFile.Name(), err)
 	}
 
 	err = tempPemFile.Close()
 	if err != nil {
-		return nil, fmt.Errorf("Couldn't close temp pem file %v: %v", tempPemFile.Name(), err)
+		return nil, fmt.Errorf("could not close temp pem file %v: %v", tempPemFile.Name(), err)
 	}
 
 	pemCerts, err := ioutil.ReadFile(tempPemFile.Name())
@@ -72,47 +78,41 @@ func AddOrUpdateCertAndKey(name string, cert string, key string, ca string) (*in
 		cn = append(cn, pemCert.DNSNames...)
 	}
 
-	if ca != "" {
-		cck, err := tls.LoadX509KeyPair(cert, key)
-		if err != nil {
-			log.Fatalf("client: loadkeys: %s", err)
-		}
-		if len(cck.Certificate) != 2 {
-			return nil, fmt.Errorf("should have 2 concatenated certificates: cert and key")
-		}
-
-		caCert, err := ioutil.ReadFile(ca)
-		if err != nil {
-			return nil, err
-		}
-
-		caCertPool := x509.NewCertPool()
-		caCertPool.AppendCertsFromPEM(caCert)
-		// Create tls config
-		tlsConfig := &tls.Config{
-			Certificates: []tls.Certificate{cck},
-			RootCAs:      caCertPool,
-		}
-		tlsConfig.BuildNameToCertificate()
-	}
-
-	if err != nil {
-		os.Remove(tempPemFile.Name())
-		return nil, err
-	}
-
 	err = os.Rename(tempPemFile.Name(), pemFileName)
 	if err != nil {
-		os.Remove(tempPemFile.Name())
-		return nil, fmt.Errorf("Couldn't move temp pem file %v to destination %v: %v", tempPemFile.Name(), pemFileName, err)
+		return nil, fmt.Errorf("could not move temp pem file %v to destination %v: %v", tempPemFile.Name(), pemFileName, err)
+	}
+
+	if len(ca) != 0 {
+		bundle := x509.NewCertPool()
+		bundle.AppendCertsFromPEM(ca)
+		opts := x509.VerifyOptions{
+			Roots: bundle,
+		}
+
+		_, err := pemCert.Verify(opts)
+		if err != nil {
+			return nil, fmt.Errorf("failed to verify certificate chain: \n\t%s\n", err)
+		}
+
+		caName := fmt.Sprintf("ca-%v.pem", name)
+		caFileName := fmt.Sprintf("%v/%v", ingress.DefaultSSLDirectory, caName)
+		err = ioutil.WriteFile(caName, ca, 0644)
+		if err != nil {
+			return nil, fmt.Errorf("could not create ca pem file %v: %v", caFileName, err)
+		}
+		return &ingress.SSLCert{
+			CAFileName:  caFileName,
+			PemFileName: pemFileName,
+			PemSHA:      pemSHA1(pemFileName),
+			CN:          cn,
+		}, nil
 	}
 
 	return &ingress.SSLCert{
-		CertFileName: cert,
-		KeyFileName:  key,
-		PemFileName:  pemFileName,
-		PemSHA:       pemSHA1(pemFileName),
-		CN:           cn,
+		PemFileName: pemFileName,
+		PemSHA:      pemSHA1(pemFileName),
+		CN:          cn,
 	}, nil
 }
 
@@ -157,16 +157,16 @@ const (
 
 // GetFakeSSLCert returns the snake oil ssl certificate created by the command
 // make-ssl-cert generate-default-snakeoil --force-overwrite
-func GetFakeSSLCert() (string, string) {
+func GetFakeSSLCert() ([]byte, []byte) {
 	cert, err := ioutil.ReadFile(snakeOilPem)
 	if err != nil {
-		return "", ""
+		return nil, nil
 	}
 
 	key, err := ioutil.ReadFile(snakeOilKey)
 	if err != nil {
-		return "", ""
+		return nil, nil
 	}
 
-	return string(cert), string(key)
+	return cert, key
 }

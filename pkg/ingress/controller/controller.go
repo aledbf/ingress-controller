@@ -783,8 +783,7 @@ func (ic *GenericController) getAuthCertificate(secretName string) (*authtls.SSL
 	}
 	cert := bc.(ingress.SSLCert)
 	return &authtls.SSLCert{
-		CertFileName: cert.CertFileName,
-		KeyFileName:  cert.KeyFileName,
+		CertFileName: cert.PemFileName,
 		CAFileName:   cert.CAFileName,
 		PemSHA:       cert.PemSHA,
 	}, nil
@@ -957,7 +956,7 @@ func (ic *GenericController) createServers(data []interface{}, upstreams map[str
 					if isHostValid(host, cert) {
 						servers[host].SSL = true
 						servers[host].SSLCertificate = cert.PemFileName
-						servers[host].SSLCertificateKey = cert.PemFileName
+						//servers[host].SSLCertificateKey = cert.PemFileName
 						servers[host].SSLPemChecksum = cert.PemSHA
 					}
 				}

@@ -79,7 +79,8 @@ Error loading new template : %v
 
 // NGINXController ...
 type NGINXController struct {
-	t      *ngx_template.Template
+	t *ngx_template.Template
+
 	binary string
 }
 
