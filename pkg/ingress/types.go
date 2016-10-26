@@ -89,13 +89,13 @@ type Configuration struct {
 
 // Upstream describes an upstream server (endpoint)
 type Upstream struct {
+	// Secure indicates if the communication with the en
+	Secure bool
 	// Name represents an unique api.Service name formatted
 	// as <namespace>-<name>-<port>
 	Name string
 	// Backends
 	Backends []UpstreamServer
-	// Secure indicates if the communication with the en
-	Secure bool
 }
 
 type SSLPassthroughUpstreams struct {
@@ -128,20 +128,20 @@ type UpstreamServer struct {
 // Server describes a virtual server
 type Server struct {
 	Name              string
-	Locations         []*Location
 	SSL               bool
+	SSLPassthrough    bool
 	SSLCertificate    string
 	SSLCertificateKey string
 	SSLPemChecksum    string
-	SSLPassthrough    bool
+	Locations         []*Location
 }
 
 // Location describes a server location
 type Location struct {
-	Path            string
 	IsDefBackend    bool
 	SecureUpstream  bool
 	EnableCORS      bool
+	Path            string
 	Upstream        Upstream
 	BasicDigestAuth auth.BasicDigest
 	RateLimit       ratelimit.RateLimit

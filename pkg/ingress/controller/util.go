@@ -78,15 +78,6 @@ func matchHostnames(pattern, host string) bool {
 	return true
 }
 
-func isDefaultUpstream(ups *ingress.Upstream) bool {
-	if ups == nil || len(ups.Backends) == 0 {
-		return false
-	}
-
-	return ups.Backends[0].Address == "127.0.0.1" &&
-		ups.Backends[0].Port == "8181"
-}
-
 // IsValidClass returns true if the given Ingress either doesn't specify
 // the ingress.class annotation, or it's set to the configured in the
 // ingress controller.

@@ -22,7 +22,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os/exec"
-	"regexp"
 	"strings"
 	text_template "text/template"
 
@@ -34,10 +33,6 @@ import (
 
 const (
 	slash = "/"
-)
-
-var (
-	camelRegexp = regexp.MustCompile("[0-9A-Za-z]+")
 )
 
 // Template ...
