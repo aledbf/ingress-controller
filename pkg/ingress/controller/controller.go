@@ -419,9 +419,11 @@ func (ic *GenericController) sync(key interface{}) error {
 	}
 	out, err := ic.cfg.Backend.Restart(data)
 	if err != nil {
+		reloadOperationsErrors.WithLabelValues(ReloadOperationsError).Inc()
 		glog.Errorf("unexpected failure restarting the backend: \n%v", string(out))
 		return err
 	}
+	reloadOperations.WithLabelValues(ReloadOperations).Inc()	
 	return nil
 }
 

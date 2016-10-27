@@ -9,12 +9,12 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/spf13/pflag"
 
 	"github.com/aledbf/ingress-controller/pkg/ingress"
 	"github.com/aledbf/ingress-controller/pkg/k8s"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"k8s.io/kubernetes/pkg/api"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/restclient"
