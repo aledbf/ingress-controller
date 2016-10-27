@@ -36,7 +36,7 @@ func NewIngressController(backend ingress.Controller) Interface {
 		ingressClass = flags.String("ingress-class", "nginx",
 			`Name of the ingress class to route through this controller.`)
 
-		nxgConfigMap = flags.String("config-map", "",
+		configMap = flags.String("configmap", "",
 			`Name of the ConfigMap that containes the custom configuration to use`)
 
 		publishSvc = flags.String("publish-service", "",
@@ -80,7 +80,8 @@ func NewIngressController(backend ingress.Controller) Interface {
 
 	flag.Set("logtostderr", "true")
 
-	//glog.Infof("Using build version %v from repo %v commit %v", version.RELEASE, version.REPO, version.COMMIT)
+	glog.Info(backend.Info())
+
 	if *ingressClass != "" {
 		glog.Infof("Watching for ingress class: %s", *ingressClass)
 	}
@@ -127,8 +128,8 @@ func NewIngressController(backend ingress.Controller) Interface {
 		glog.Infof("service %v validated as source of Ingress status", *publishSvc)
 	}
 
-	if *nxgConfigMap != "" {
-		_, _, err = k8s.ParseNameNS(*nxgConfigMap)
+	if *configMap != "" {
+		_, _, err = k8s.ParseNameNS(*configMap)
 		if err != nil {
 			glog.Fatalf("configmap error: %v", err)
 		}
@@ -143,7 +144,7 @@ func NewIngressController(backend ingress.Controller) Interface {
 		DefaultService:        *defaultSvc,
 		IngressClass:          *ingressClass,
 		Namespace:             *watchNamespace,
-		ConfigMapName:         *nxgConfigMap,
+		ConfigMapName:         *configMap,
 		TCPConfigMapName:      *tcpConfigMapName,
 		UDPConfigMapName:      *udpConfigMapName,
 		DefaultSSLCertificate: *defSSLCertificate,
@@ -165,7 +166,7 @@ func registerHandlers(enableProfiling bool, port int, ic Interface) {
 
 	mux.HandleFunc("/build", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		//fmt.Fprintf(w, "build version %v from repo %v commit %v", version.RELEASE, version.REPO, version.COMMIT)
+		fmt.Fprintf(w, ic.Info())
 	})
 
 	mux.HandleFunc("/stop", func(w http.ResponseWriter, r *http.Request) {

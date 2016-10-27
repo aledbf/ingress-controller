@@ -13,7 +13,7 @@ ifndef COMMIT
   COMMIT := git-$(shell git rev-parse --short HEAD)
 endif
 
-PKG := "github.com/aledbf/ingress-controller/backends/nginx"
+PKG=github.com/aledbf/ingress-controller/backends/nginx
 
 build: clean
 	CGO_ENABLED=0 GOOS=${GOOS} go build -a -installsuffix cgo \

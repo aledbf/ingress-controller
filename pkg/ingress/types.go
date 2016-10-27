@@ -61,7 +61,7 @@ type Controller interface {
 	// - Endpoints: referenced from Services and what the backend uses
 	//	 to route traffic
 	//
-	// ConfigMap content of --config-map
+	// ConfigMap content of --configmap
 	// Configuration returns the translation from Ingress rules containing
 	// information about all the upstreams (service endpoints ) "virtual"
 	// servers (FQDN)
@@ -75,6 +75,9 @@ type Controller interface {
 	// IsReloadRequired checks if the backend must be reloaded or not.
 	// The parameter contains the new rendered template
 	IsReloadRequired([]byte) bool
+	// Info returns information about the ingress controller
+	// This can include build version, repository, etc.
+	Info() string
 }
 
 // Configuration describes

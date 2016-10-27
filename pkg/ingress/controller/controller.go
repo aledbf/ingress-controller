@@ -76,6 +76,8 @@ type Interface interface {
 	Start()
 	Stop() error
 
+	Info() string
+
 	healthz.HealthzChecker
 }
 
@@ -337,6 +339,16 @@ func (ic GenericController) Check(_ *http.Request) error {
 	return nil
 }
 
+// Info returns information about the backend
+func (ic GenericController) Info() string {
+	return ic.cfg.Backend.Info()
+}
+
+// IngressClass returns information about the backend
+func (ic GenericController) IngressClass() string {
+	return ic.cfg.IngressClass
+}
+
 // getSecret searchs for a secret in the local secrets Store
 func (ic *GenericController) getSecret(name string) (*api.Secret, error) {
 	s, exists, err := ic.secrLister.Store.GetByKey(name)
@@ -423,7 +435,7 @@ func (ic *GenericController) sync(key interface{}) error {
 		glog.Errorf("unexpected failure restarting the backend: \n%v", string(out))
 		return err
 	}
-	reloadOperations.WithLabelValues(ReloadOperations).Inc()	
+	reloadOperations.WithLabelValues(ReloadOperations).Inc()
 	return nil
 }
 

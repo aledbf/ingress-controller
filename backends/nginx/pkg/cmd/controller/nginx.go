@@ -30,6 +30,7 @@ import (
 
 	"github.com/aledbf/ingress-controller/backends/nginx/pkg/config"
 	ngx_template "github.com/aledbf/ingress-controller/backends/nginx/pkg/template"
+	"github.com/aledbf/ingress-controller/backends/nginx/pkg/version"
 
 	"k8s.io/kubernetes/pkg/api"
 )
@@ -163,6 +164,11 @@ func (n NGINXController) IsReloadRequired(data []byte) bool {
 		return len(diffOutput) > 0
 	}
 	return false
+}
+
+// Info return build information
+func (n NGINXController) Info() string {
+	return fmt.Sprintf("build version %v from repo %v commit %v", version.RELEASE, version.REPO, version.COMMIT)
 }
 
 // testTemplate checks if the NGINX configuration inside the byte array is valid
