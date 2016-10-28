@@ -404,6 +404,9 @@ stream {
 
     server {
         listen                  443;
+
+        {{ if $cfg.useProxyProtocol }}proxy_protocol on;{{ end }}
+
         proxy_pass              $stream_upstream;
         ssl_preread             on;
     }
