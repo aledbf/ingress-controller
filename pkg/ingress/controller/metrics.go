@@ -19,34 +19,42 @@ package controller
 import "github.com/prometheus/client_golang/prometheus"
 
 const (
-	// IngressSubsystem definition of Ingress sub system
-	IngressSubsystem = "ingress_controller"
-	// ReloadOperations ...
-	ReloadOperations = "reload_operations"
-	// ReloadOperationsError ...
-	ReloadOperationsError = "reload_operations_errors"
+	ns          = "ingress_controller"
+	operation   = "count"
+	reloadLabel = "reloads"
 )
 
 func init() {
-	prometheus.MustRegister(reloadOperations)
-	prometheus.MustRegister(reloadOperationsErrors)
+	prometheus.MustRegister(reloadOperation)
+	prometheus.MustRegister(reloadOperationErrors)
+
+	reloadOperationErrors.WithLabelValues(reloadLabel).Set(0)
+	reloadOperation.WithLabelValues(reloadLabel).Set(0)
 }
 
 var (
-	reloadOperations = prometheus.NewCounterVec(
+	reloadOperation = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
-			Subsystem: "reload_operations",
-			Name:      ReloadOperations,
-			Help:      "Cumulative number of Ingress controller reload operations by operation type.",
+			Namespace: ns,
+			Name:      "sucess",
+			Help:      "Cumulative number of Ingress controller reload operations",
 		},
-		[]string{"operation_type"},
+		[]string{operation},
 	)
-	reloadOperationsErrors = prometheus.NewCounterVec(
+	reloadOperationErrors = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
-			Subsystem: IngressSubsystem,
-			Name:      ReloadOperationsError,
-			Help:      "Cumulative number of Ingress controller reload opetation errors by operation type.",
+			Namespace: ns,
+			Name:      "errors",
+			Help:      "Cumulative number of Ingress controller errors during a reload opetation",
 		},
-		[]string{"operation_type"},
+		[]string{operation},
 	)
 )
+
+func incReloadCount() {
+	reloadOperationErrors.WithLabelValues(reloadLabel).Inc()
+}
+
+func incReloadErrorCount() {
+	reloadOperation.WithLabelValues(reloadLabel).Inc()
+}

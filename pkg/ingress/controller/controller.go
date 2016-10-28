@@ -431,11 +431,11 @@ func (ic *GenericController) sync(key interface{}) error {
 	}
 	out, err := ic.cfg.Backend.Restart(data)
 	if err != nil {
-		reloadOperationsErrors.WithLabelValues(ReloadOperationsError).Inc()
+		incReloadCount()
 		glog.Errorf("unexpected failure restarting the backend: \n%v", string(out))
 		return err
 	}
-	reloadOperations.WithLabelValues(ReloadOperations).Inc()
+	incReloadErrorCount()
 	return nil
 }
 
@@ -699,7 +699,7 @@ func (ic *GenericController) getUpstreamServers() ([]*ingress.Upstream, []*ingre
 			if rule.HTTP == nil &&
 				len(ing.Spec.TLS) == 0 &&
 				host != defServerName {
-				glog.V(2).Infof("ingress rule %v/%v does not contains HTTP or TLS rules. using default backend", ing.Namespace, ing.Name)
+				glog.V(3).Infof("ingress rule %v/%v does not contains HTTP or TLS rules. using default backend", ing.Namespace, ing.Name)
 				server.Locations[0].Upstream = *defBackend
 				continue
 			}
