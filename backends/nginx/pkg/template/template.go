@@ -32,14 +32,17 @@ import (
 )
 
 const (
-	slash = "/"
+	slash         = "/"
+	defBufferSize = 65535
 )
 
 // Template ...
 type Template struct {
-	tmpl *text_template.Template
-	fw   watch.FileWatcher
-	s    int
+	tmpl      *text_template.Template
+	fw        watch.FileWatcher
+	s         int
+	tmplBuf   *bytes.Buffer
+	outCmdBuf *bytes.Buffer
 }
 
 //NewTemplate returns a new Template instance or an
@@ -55,9 +58,11 @@ func NewTemplate(file string, onChange func()) (*Template, error) {
 	}
 
 	return &Template{
-		tmpl: tmpl,
-		fw:   fw,
-		s:    65535,
+		tmpl:      tmpl,
+		fw:        fw,
+		s:         defBufferSize,
+		tmplBuf:   bytes.NewBuffer(make([]byte, 0, defBufferSize)),
+		outCmdBuf: bytes.NewBuffer(make([]byte, 0, defBufferSize)),
 	}, nil
 }
 
@@ -71,6 +76,9 @@ func (t *Template) Close() {
 func (t *Template) Write(conf map[string]interface{},
 	isValidTemplate func([]byte) error) ([]byte, error) {
 
+	defer t.tmplBuf.Reset()
+	defer t.outCmdBuf.Reset()
+
 	if glog.V(3) {
 		b, err := json.Marshal(conf)
 		if err != nil {
@@ -79,26 +87,26 @@ func (t *Template) Write(conf map[string]interface{},
 		glog.Infof("NGINX configuration: %v", string(b))
 	}
 
-	buffer := bytes.NewBuffer(make([]byte, 0, t.s))
-	err := t.tmpl.Execute(buffer, conf)
+	err := t.tmpl.Execute(t.tmplBuf, conf)
 
-	if t.s < buffer.Cap() {
-		glog.V(2).Infof("adjusting template buffer size from %v to %v", t.s, buffer.Cap())
-		t.s = buffer.Cap()
+	if t.s < t.tmplBuf.Cap() {
+		glog.V(2).Infof("adjusting template buffer size from %v to %v", t.s, t.tmplBuf.Cap())
+		t.s = t.tmplBuf.Cap()
+		t.tmplBuf = bytes.NewBuffer(make([]byte, 0, t.tmplBuf.Cap()))
+		t.outCmdBuf = bytes.NewBuffer(make([]byte, 0, t.outCmdBuf.Cap()))
 	}
 
 	// squeezes multiple adjacent empty lines to be single
 	// spaced this is to avoid the use of regular expressions
 	cmd := exec.Command("/ingress-controller/clean-nginx-conf.sh")
-	cmd.Stdin = buffer
-	out := bytes.NewBuffer(make([]byte, 0, t.s))
-	cmd.Stdout = out
+	cmd.Stdin = t.tmplBuf
+	cmd.Stdout = t.outCmdBuf
 	if err := cmd.Run(); err != nil {
 		glog.Warningf("unexpected error cleaning template: %v", err)
-		return buffer.Bytes(), nil
+		return t.tmplBuf.Bytes(), nil
 	}
 
-	content := out.Bytes()
+	content := t.outCmdBuf.Bytes()
 	err = isValidTemplate(content)
 	if err != nil {
 		return nil, err
