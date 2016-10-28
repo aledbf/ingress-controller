@@ -912,7 +912,7 @@ func (ic *GenericController) createServers(data []interface{}, upstreams map[str
 	servers[defServerName] = &ingress.Server{
 		Name: defServerName,
 		Locations: []*ingress.Location{
-			&ingress.Location{
+			{
 				Path:         rootLocation,
 				IsDefBackend: true,
 				Upstream:     *ic.getDefaultUpstream(),
@@ -941,7 +941,7 @@ func (ic *GenericController) createServers(data []interface{}, upstreams map[str
 			servers[host] = &ingress.Server{
 				Name: host,
 				Locations: []*ingress.Location{
-					&ingress.Location{
+					{
 						Path:         rootLocation,
 						IsDefBackend: true,
 						Upstream:     *ic.getDefaultUpstream(),
