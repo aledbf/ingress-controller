@@ -36,7 +36,7 @@ var (
 	reloadOperation = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Namespace: ns,
-			Name:      "sucess",
+			Name:      "success",
 			Help:      "Cumulative number of Ingress controller reload operations",
 		},
 		[]string{operation},
