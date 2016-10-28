@@ -101,6 +101,8 @@ type Upstream struct {
 	Backends []UpstreamServer
 }
 
+// SSLPassthroughUpstreams describes an SSL upstream server configured
+// as passthrough (no TLS termination)
 type SSLPassthroughUpstreams struct {
 	Upstream
 
