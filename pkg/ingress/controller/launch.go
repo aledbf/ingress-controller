@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/pprof"
 	"os"
+	"syscall"
 	"time"
 
 	"github.com/golang/glog"
@@ -170,7 +171,7 @@ func registerHandlers(enableProfiling bool, port int, ic Interface) {
 	})
 
 	mux.HandleFunc("/stop", func(w http.ResponseWriter, r *http.Request) {
-		ic.Stop()
+		syscall.Kill(syscall.Getpid(), syscall.SIGTERM)
 	})
 
 	if enableProfiling {
