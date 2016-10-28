@@ -45,7 +45,7 @@ var (
 		prometheus.CounterOpts{
 			Namespace: ns,
 			Name:      "errors",
-			Help:      "Cumulative number of Ingress controller errors during a reload opetation",
+			Help:      "Cumulative number of Ingress controller errors during reload operations",
 		},
 		[]string{operation},
 	)
