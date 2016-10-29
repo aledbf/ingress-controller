@@ -56,6 +56,7 @@ import (
 	"github.com/aledbf/ingress-controller/pkg/ingress/annotations/sslpassthrough"
 	"github.com/aledbf/ingress-controller/pkg/ingress/status"
 	"github.com/aledbf/ingress-controller/pkg/k8s"
+	local_strings "github.com/aledbf/ingress-controller/pkg/strings"
 	"github.com/aledbf/ingress-controller/pkg/task"
 )
 
@@ -69,6 +70,11 @@ const (
 	// only processes Ingresses with this annotation either unset, or set
 	// to either the configured value or the empty string.
 	ingressClassKey = "kubernetes.io/ingress.class"
+)
+
+var (
+	// list of ports that cannot be used by TCP or UDP services
+	reservedPorts = []string{"80", "443", "8181", "18080"}
 )
 
 // Interface holds the methods to handle an Ingress backend
@@ -429,13 +435,16 @@ func (ic *GenericController) sync(key interface{}) error {
 	if !ic.cfg.Backend.IsReloadRequired(data) {
 		return nil
 	}
+
+	glog.Infof("reloading ingress backend...")
 	out, err := ic.cfg.Backend.Restart(data)
 	if err != nil {
-		incReloadCount()
+		incReloadErrorCount()
 		glog.Errorf("unexpected failure restarting the backend: \n%v", string(out))
 		return err
 	}
-	incReloadErrorCount()
+	glog.Infof("ingress backend successfully reloaded...")
+	incReloadCount()
 	return nil
 }
 
@@ -491,7 +500,7 @@ func (ic *GenericController) getStreamServices(data map[string]string, proto api
 		}
 
 		// this ports used by the backend
-		if k == "80" || k == "443" || k == "8181" || k == "18080" {
+		if local_strings.StringInSlice(k, reservedPorts) {
 			glog.Warningf("port %v cannot be used for TCP or UDP services. It is reserved for the Ingress controller", k)
 			continue
 		}
@@ -542,6 +551,8 @@ func (ic *GenericController) getStreamServices(data map[string]string, proto api
 				}
 			}
 		}
+
+		sort.Sort(ingress.UpstreamServerByAddrPort(endps))
 
 		// tcp upstreams cannot contain empty upstreams and there is no
 		// default backend equivalent for TCP

@@ -10,15 +10,15 @@ This project contains the boilerplate to create an Ingress controller in order t
 See [Ingress controller documentation](https://github.com/kubernetes/contrib/blob/master/ingress/controllers/README.md) for details on how it works.
 
 
-### Backends
+### Available backends
  - [NGINX](https://github.com/aledbf/ingress-controller/blob/master/backends/nginx)
 
 
 ### How I can use X as backend?
 
-Chek if the backend is available [here](https://github.com/aledbf/ingress-controller/blob/master/backends)
+If is not present in the previous list you can create a new backend using the next steps as a reference:
 
-Create a [main.go](https://github.com/aledbf/ingress-controller/blob/master/backends/nginx/pkg/cmd/controller/main.go) file 
+- Create a [main.go](https://github.com/aledbf/ingress-controller/blob/master/backends/nginx/pkg/cmd/controller/main.go) file 
 ```
 func main() {
 	// start a new nginx controller
@@ -32,7 +32,7 @@ func main() {
 }
 ```
 
-Implement the [Controller](https://github.com/aledbf/ingress-controller/blob/master/pkg/ingress/types.go#L40) interface
+- Implement the [Controller](https://github.com/aledbf/ingress-controller/blob/master/pkg/ingress/types.go#L40) interface
 ```
 type Controller interface {
 	// Start returns the command is executed to start the backend.

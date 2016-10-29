@@ -420,8 +420,8 @@ stream {
     
     server {
         listen {{ $tcpServer.Path }};
-        proxy_connect_timeout  {{ $cfg.proxyConnectTimeout }};
-        proxy_timeout          {{ $cfg.proxyReadTimeout }};
+        proxy_connect_timeout  {{ $tcpServer.Proxy.ConnectTimeout }}s;
+        proxy_timeout          {{ $tcpServer.Proxy.ReadTimeout }}s;
         proxy_pass             tcp-{{ $tcpServer.Upstream.Name }};
     }
 {{ end }}
