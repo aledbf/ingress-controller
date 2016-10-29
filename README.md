@@ -18,7 +18,7 @@ See [Ingress controller documentation](https://github.com/kubernetes/contrib/blo
 
 Chek if the backend is available [here](https://github.com/aledbf/ingress-controller/blob/master/backends)
 
-Create a `main.go` file 
+Create a [main.go](https://github.com/aledbf/ingress-controller/blob/master/backends/nginx/pkg/cmd/controller/main.go) file 
 ```
 func main() {
 	// start a new nginx controller
