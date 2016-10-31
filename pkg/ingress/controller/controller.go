@@ -804,10 +804,11 @@ func (ic *GenericController) getUpstreamServers() ([]*ingress.Upstream, []*ingre
 func (ic *GenericController) getAuthCertificate(secretName string) (*authtls.SSLCert, error) {
 	bc, exists := ic.sslCertTracker.Get(secretName)
 	if !exists {
-		return nil, fmt.Errorf("service %v does not exists", secretName)
+		return &authtls.SSLCert{}, fmt.Errorf("secret %v does not exists", secretName)
 	}
-	cert := bc.(ingress.SSLCert)
+	cert := bc.(*ingress.SSLCert)
 	return &authtls.SSLCert{
+		Secret:       secretName,
 		CertFileName: cert.PemFileName,
 		CAFileName:   cert.CAFileName,
 		PemSHA:       cert.PemSHA,

@@ -32,6 +32,7 @@ const (
 
 // SSLCert returns external authentication configuration for an Ingress rule
 type SSLCert struct {
+	Secret       string
 	CertFileName string
 	KeyFileName  string
 	CAFileName   string
