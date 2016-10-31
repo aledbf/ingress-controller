@@ -52,9 +52,9 @@ var (
 )
 
 func incReloadCount() {
-	reloadOperationErrors.WithLabelValues(reloadLabel).Inc()
+	reloadOperation.WithLabelValues(reloadLabel).Inc()
 }
 
 func incReloadErrorCount() {
-	reloadOperation.WithLabelValues(reloadLabel).Inc()
+	reloadOperationErrors.WithLabelValues(reloadLabel).Inc()
 }
