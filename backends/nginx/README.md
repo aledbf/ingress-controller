@@ -11,7 +11,6 @@ This is an nginx Ingress controller that uses [ConfigMap](https://github.com/kub
 * [Recent changes](#recent-changes)
 * [Conventions](#conventions)
 * [Requirements](#what-it-provides)
-* [Dry running](#dry-running-the-ingress-controller)
 * [Deployment](#deployment)
 * [Health checks](#health-checks)
 * [HTTP](#http)
@@ -52,16 +51,6 @@ and create the secret via `kubectl create secret tls --key file --cert file`
 ## Requirements
 - Default backend [404-server](https://github.com/kubernetes/contrib/tree/master/404-server)
 
-
-## Dry running the Ingress controller
-
-Before deploying the controller to production you might want to run it outside the cluster and observe it.
-
-```console
-$ make controller
-$ mkdir /etc/nginx-ssl
-$ ./nginx-ingress-controller --running-in-cluster=false --default-backend-service=kube-system/default-http-backend
-```
 
 ## Deployment
 
