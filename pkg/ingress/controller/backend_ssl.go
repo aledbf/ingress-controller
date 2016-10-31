@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/cache"
 
 	"github.com/aledbf/ingress-controller/pkg/ingress"
+	"github.com/aledbf/ingress-controller/pkg/ingress/annotations/parser"
 	ssl "github.com/aledbf/ingress-controller/pkg/net/ssl"
 	"github.com/golang/glog"
 )
@@ -76,23 +77,21 @@ func (ic *GenericController) syncSecret(k interface{}) error {
 	}
 	sec := secObj.(*api.Secret)
 	if !ic.secrReferenced(sec.Name, sec.Namespace) {
-		glog.V(5).Infof("secret %v/%v is not used in Ingress rules. Skipping ", sec.Namespace, sec.Name)
+		glog.V(2).Infof("secret %v/%v is not used in Ingress rules. skipping ", sec.Namespace, sec.Name)
 		return nil
 	}
-
-	// create certificates and add or update the item in the store
-	_, exists = ic.sslCertTracker.Get(key)
 
 	cert, err = ic.getPemCertificate(key)
 	if err != nil {
 		return err
 	}
 
+	// create certificates and add or update the item in the store
+	_, exists = ic.sslCertTracker.Get(key)
 	if exists {
 		ic.sslCertTracker.Update(key, cert)
 		return nil
 	}
-
 	ic.sslCertTracker.Add(key, cert)
 	return nil
 }
@@ -133,6 +132,11 @@ func (ic *GenericController) getPemCertificate(secretName string) (*ingress.SSLC
 func (ic *GenericController) secrReferenced(name, namespace string) bool {
 	for _, ingIf := range ic.ingLister.Store.List() {
 		ing := ingIf.(*extensions.Ingress)
+		str, err := parser.GetStringAnnotation("ingress.kubernetes.io/auth-tls-secret", ing)
+		if err == nil && str == fmt.Sprintf("%v/%v", namespace, name) {
+			return true
+		}
+
 		if ing.Namespace != namespace {
 			continue
 		}

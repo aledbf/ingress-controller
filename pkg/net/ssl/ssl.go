@@ -83,7 +83,7 @@ func AddOrUpdateCertAndKey(name string, cert, key, ca []byte) (*ingress.SSLCert,
 		return nil, fmt.Errorf("could not move temp pem file %v to destination %v: %v", tempPemFile.Name(), pemFileName, err)
 	}
 
-	if len(ca) != 0 {
+	if len(ca) > 0 {
 		bundle := x509.NewCertPool()
 		bundle.AppendCertsFromPEM(ca)
 		opts := x509.VerifyOptions{
@@ -97,10 +97,17 @@ func AddOrUpdateCertAndKey(name string, cert, key, ca []byte) (*ingress.SSLCert,
 
 		caName := fmt.Sprintf("ca-%v.pem", name)
 		caFileName := fmt.Sprintf("%v/%v", ingress.DefaultSSLDirectory, caName)
-		err = ioutil.WriteFile(caName, ca, 0644)
+		f, err := os.Create(caFileName)
 		if err != nil {
 			return nil, fmt.Errorf("could not create ca pem file %v: %v", caFileName, err)
 		}
+		defer f.Close()
+		_, err = f.Write(ca)
+		if err != nil {
+			return nil, fmt.Errorf("could not create ca pem file %v: %v", caFileName, err)
+		}
+		f.Write([]byte("\n"))
+
 		return &ingress.SSLCert{
 			CAFileName:  caFileName,
 			PemFileName: pemFileName,
