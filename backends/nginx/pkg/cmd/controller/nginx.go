@@ -32,7 +32,7 @@ import (
 	ngx_template "github.com/aledbf/ingress-controller/backends/nginx/pkg/template"
 	"github.com/aledbf/ingress-controller/backends/nginx/pkg/version"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/client-go/1.5/pkg/api"
 )
 
 var (

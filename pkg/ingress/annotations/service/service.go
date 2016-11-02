@@ -21,9 +21,9 @@ import (
 	"fmt"
 	"strconv"
 
-	"k8s.io/kubernetes/pkg/api"
-
 	"github.com/golang/glog"
+
+	api "k8s.io/client-go/1.5/pkg/api/v1"
 )
 
 const (

@@ -23,17 +23,17 @@ import (
 
 	"github.com/golang/glog"
 
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/errors"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	"k8s.io/kubernetes/pkg/client/leaderelection"
-	"k8s.io/kubernetes/pkg/client/leaderelection/resourcelock"
-	"k8s.io/kubernetes/pkg/client/record"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/client-go/1.5/kubernetes"
+	"k8s.io/client-go/1.5/pkg/api/errors"
+	api "k8s.io/client-go/1.5/pkg/api/v1"
+	"k8s.io/client-go/1.5/tools/record"
+
+	"github.com/aledbf/ingress-controller/pkg/k8s/client/leaderelection"
+	"github.com/aledbf/ingress-controller/pkg/k8s/client/leaderelection/resourcelock"
 )
 
-func getCurrentLeader(electionID, namespace string, c client.Interface) (string, *api.Endpoints, error) {
-	endpoints, err := c.Endpoints(namespace).Get(electionID)
+func getCurrentLeader(electionID, namespace string, c kubernetes.Interface) (string, *api.Endpoints, error) {
+	endpoints, err := c.Core().Endpoints(namespace).Get(electionID)
 	if err != nil {
 		return "", nil, err
 	}
@@ -55,13 +55,13 @@ func NewElection(electionID,
 	namespace string,
 	ttl time.Duration,
 	callback func(leader string),
-	c client.Interface,
-	leaderElectionClient *clientset.Clientset) (*leaderelection.LeaderElector, error) {
+	c kubernetes.Interface,
+	leaderElectionClient *kubernetes.Clientset) (*leaderelection.LeaderElector, error) {
 
-	_, err := c.Endpoints(namespace).Get(electionID)
+	_, err := c.Core().Endpoints(namespace).Get(electionID)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			_, err = c.Endpoints(namespace).Create(&api.Endpoints{
+			_, err = c.Core().Endpoints(namespace).Create(&api.Endpoints{
 				ObjectMeta: api.ObjectMeta{
 					Name: electionID,
 				},

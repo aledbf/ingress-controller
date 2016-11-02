@@ -28,17 +28,18 @@ import (
 
 	"github.com/golang/glog"
 
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/client/cache"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	"k8s.io/kubernetes/pkg/client/record"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/healthz"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util/flowcontrol"
-	"k8s.io/kubernetes/pkg/util/intstr"
-	"k8s.io/kubernetes/pkg/watch"
+
+	"k8s.io/client-go/1.5/kubernetes"
+	types "k8s.io/client-go/1.5/pkg/api"
+	api "k8s.io/client-go/1.5/pkg/api/v1"
+	extensions "k8s.io/client-go/1.5/pkg/apis/extensions/v1beta1"
+	"k8s.io/client-go/1.5/pkg/runtime"
+	"k8s.io/client-go/1.5/pkg/util/flowcontrol"
+	"k8s.io/client-go/1.5/pkg/util/intstr"
+	"k8s.io/client-go/1.5/pkg/watch"
+	"k8s.io/client-go/1.5/tools/cache"
+	"k8s.io/client-go/1.5/tools/record"
 
 	cache_store "github.com/aledbf/ingress-controller/pkg/cache"
 	"github.com/aledbf/ingress-controller/pkg/ingress"
@@ -129,8 +130,8 @@ type GenericController struct {
 
 // Configuration contains all the settings required by an Ingress controller
 type Configuration struct {
-	Client         *client.Client
-	ElectionClient *clientset.Clientset
+	Client         kubernetes.Interface
+	ElectionClient *kubernetes.Clientset
 
 	ResyncPeriod   time.Duration
 	DefaultService string
@@ -154,7 +155,7 @@ func newIngressController(config *Configuration) Interface {
 
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
-	eventBroadcaster.StartRecordingToSink(config.Client.Events(config.Namespace))
+	eventBroadcaster.StartRecordingToSink(config.Client.Core().Events(config.Namespace))
 
 	ic := GenericController{
 		cfg:             config,
@@ -253,61 +254,61 @@ func newIngressController(config *Configuration) Interface {
 
 	ic.ingLister.Store, ic.ingController = cache.NewInformer(
 		&cache.ListWatch{
-			ListFunc: func(opts api.ListOptions) (runtime.Object, error) {
-				return ic.cfg.Client.Extensions().Ingress(ic.cfg.Namespace).List(opts)
+			ListFunc: func(opts types.ListOptions) (runtime.Object, error) {
+				return ic.cfg.Client.Extensions().Ingresses(ic.cfg.Namespace).List(opts)
 			},
-			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return ic.cfg.Client.Extensions().Ingress(ic.cfg.Namespace).Watch(options)
+			WatchFunc: func(options types.ListOptions) (watch.Interface, error) {
+				return ic.cfg.Client.Extensions().Ingresses(ic.cfg.Namespace).Watch(options)
 			},
 		},
 		&extensions.Ingress{}, ic.cfg.ResyncPeriod, ingEventHandler)
 
 	ic.endpLister.Store, ic.endpController = cache.NewInformer(
 		&cache.ListWatch{
-			ListFunc: func(opts api.ListOptions) (runtime.Object, error) {
-				return ic.cfg.Client.Endpoints(ic.cfg.Namespace).List(opts)
+			ListFunc: func(opts types.ListOptions) (runtime.Object, error) {
+				return ic.cfg.Client.Core().Endpoints(ic.cfg.Namespace).List(opts)
 			},
-			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return ic.cfg.Client.Endpoints(ic.cfg.Namespace).Watch(options)
+			WatchFunc: func(options types.ListOptions) (watch.Interface, error) {
+				return ic.cfg.Client.Core().Endpoints(ic.cfg.Namespace).Watch(options)
 			},
 		},
-		&api.Endpoints{}, ic.cfg.ResyncPeriod, eventHandler)
+		&types.Endpoints{}, ic.cfg.ResyncPeriod, eventHandler)
 
 	ic.svcLister.Indexer, ic.svcController = cache.NewIndexerInformer(
 		&cache.ListWatch{
-			ListFunc: func(opts api.ListOptions) (runtime.Object, error) {
-				return ic.cfg.Client.Services(ic.cfg.Namespace).List(opts)
+			ListFunc: func(opts types.ListOptions) (runtime.Object, error) {
+				return ic.cfg.Client.Core().Services(ic.cfg.Namespace).List(opts)
 			},
-			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return ic.cfg.Client.Services(ic.cfg.Namespace).Watch(options)
+			WatchFunc: func(options types.ListOptions) (watch.Interface, error) {
+				return ic.cfg.Client.Core().Services(ic.cfg.Namespace).Watch(options)
 			},
 		},
-		&api.Service{},
+		&types.Service{},
 		ic.cfg.ResyncPeriod,
 		cache.ResourceEventHandlerFuncs{},
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 
 	ic.secrLister.Store, ic.secrController = cache.NewInformer(
 		&cache.ListWatch{
-			ListFunc: func(opts api.ListOptions) (runtime.Object, error) {
-				return ic.cfg.Client.Secrets(ic.cfg.Namespace).List(opts)
+			ListFunc: func(opts types.ListOptions) (runtime.Object, error) {
+				return ic.cfg.Client.Core().Secrets(ic.cfg.Namespace).List(opts)
 			},
-			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return ic.cfg.Client.Secrets(ic.cfg.Namespace).Watch(options)
+			WatchFunc: func(options types.ListOptions) (watch.Interface, error) {
+				return ic.cfg.Client.Core().Secrets(ic.cfg.Namespace).Watch(options)
 			},
 		},
-		&api.Secret{}, ic.cfg.ResyncPeriod, secrEventHandler)
+		&types.Secret{}, ic.cfg.ResyncPeriod, secrEventHandler)
 
 	ic.mapLister.Store, ic.mapController = cache.NewInformer(
 		&cache.ListWatch{
-			ListFunc: func(opts api.ListOptions) (runtime.Object, error) {
-				return ic.cfg.Client.ConfigMaps(ic.cfg.Namespace).List(opts)
+			ListFunc: func(opts types.ListOptions) (runtime.Object, error) {
+				return ic.cfg.Client.Core().ConfigMaps(ic.cfg.Namespace).List(opts)
 			},
-			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return ic.cfg.Client.ConfigMaps(ic.cfg.Namespace).Watch(options)
+			WatchFunc: func(options types.ListOptions) (watch.Interface, error) {
+				return ic.cfg.Client.Core().ConfigMaps(ic.cfg.Namespace).Watch(options)
 			},
 		},
-		&api.ConfigMap{}, ic.cfg.ResyncPeriod, mapEventHandler)
+		&types.ConfigMap{}, ic.cfg.ResyncPeriod, mapEventHandler)
 
 	ic.syncStatus = status.NewStatusSyncer(status.Config{
 		Client:         config.Client,
@@ -356,7 +357,7 @@ func (ic GenericController) IngressClass() string {
 }
 
 // getSecret searchs for a secret in the local secrets Store
-func (ic *GenericController) getSecret(name string) (*api.Secret, error) {
+func (ic *GenericController) getSecret(name string) (*types.Secret, error) {
 	s, exists, err := ic.secrLister.Store.GetByKey(name)
 	if err != nil {
 		return nil, err
@@ -364,12 +365,12 @@ func (ic *GenericController) getSecret(name string) (*api.Secret, error) {
 	if !exists {
 		return nil, fmt.Errorf("secret %v was not found", name)
 	}
-	return s.(*api.Secret), nil
+	return s.(*types.Secret), nil
 }
 
 func (ic *GenericController) getConfigMap(ns, name string) (*api.ConfigMap, error) {
 	// TODO: check why ic.mapLister.Store.GetByKey(mapKey) is not stable (random content)
-	return ic.cfg.Client.ConfigMaps(ns).Get(name)
+	return ic.cfg.Client.Core().ConfigMaps(ns).Get(name)
 }
 
 // sync collects all the pieces required to assemble the configuration file and
