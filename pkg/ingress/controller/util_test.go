@@ -19,8 +19,8 @@ package controller
 import (
 	"testing"
 
-	"k8s.io/client-go/1.5/pkg/api"
-	extensions "k8s.io/client-go/1.5/pkg/apis/extensions/v1beta1"
+	"k8s.io/client-go/pkg/api"
+	extensions "k8s.io/client-go/pkg/apis/extensions/v1beta1"
 )
 
 func TestIsValidClass(t *testing.T) {

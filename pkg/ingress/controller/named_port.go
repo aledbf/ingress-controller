@@ -26,10 +26,9 @@ import (
 
 	"github.com/aledbf/ingress-controller/pkg/ingress/annotations/service"
 
-	types "k8s.io/client-go/1.5/pkg/api"
-	api "k8s.io/client-go/1.5/pkg/api/v1"
-	"k8s.io/client-go/1.5/pkg/labels"
-	"k8s.io/client-go/1.5/pkg/util/intstr"
+	api "k8s.io/client-go/pkg/api/v1"
+	"k8s.io/client-go/pkg/labels"
+	"k8s.io/client-go/pkg/util/intstr"
 )
 
 // checkSvcForUpdate verifies if one of the running pods for a service contains
@@ -39,8 +38,8 @@ import (
 func (ic *GenericController) checkSvcForUpdate(svc *api.Service) error {
 	// get the pods associated with the service
 	// TODO: switch this to a watch
-	pods, err := ic.cfg.Client.Core().Pods(svc.Namespace).List(types.ListOptions{
-		LabelSelector: labels.SelectorFromValidatedSet(labels.Set(svc.Spec.Selector)),
+	pods, err := ic.cfg.Client.Core().Pods(svc.Namespace).List(api.ListOptions{
+		LabelSelector: labels.SelectorFromValidatedSet(labels.Set(svc.Spec.Selector)).String(),
 	})
 
 	if err != nil {

@@ -19,8 +19,8 @@ package ingress
 import (
 	"os/exec"
 
-	"k8s.io/client-go/1.5/pkg/api/unversioned"
-	api "k8s.io/client-go/1.5/pkg/api/v1"
+	"k8s.io/client-go/pkg/api/unversioned"
+	api "k8s.io/client-go/pkg/api/v1"
 
 	"github.com/aledbf/ingress-controller/pkg/ingress/annotations/auth"
 	"github.com/aledbf/ingress-controller/pkg/ingress/annotations/authreq"

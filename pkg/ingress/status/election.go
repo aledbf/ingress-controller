@@ -23,10 +23,10 @@ import (
 
 	"github.com/golang/glog"
 
-	"k8s.io/client-go/1.5/kubernetes"
-	"k8s.io/client-go/1.5/pkg/api/errors"
-	api "k8s.io/client-go/1.5/pkg/api/v1"
-	"k8s.io/client-go/1.5/tools/record"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/pkg/api/errors"
+	api "k8s.io/client-go/pkg/api/v1"
+	"k8s.io/client-go/tools/record"
 
 	"github.com/aledbf/ingress-controller/pkg/k8s/client/leaderelection"
 	"github.com/aledbf/ingress-controller/pkg/k8s/client/leaderelection/resourcelock"

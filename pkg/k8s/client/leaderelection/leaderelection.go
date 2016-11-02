@@ -53,11 +53,11 @@ import (
 	"reflect"
 	"time"
 
-	"k8s.io/client-go/1.5/pkg/api/errors"
-	"k8s.io/client-go/1.5/pkg/api/unversioned"
-	"k8s.io/client-go/1.5/pkg/apis/componentconfig"
-	"k8s.io/client-go/1.5/pkg/util/runtime"
-	"k8s.io/client-go/1.5/pkg/util/wait"
+	"k8s.io/client-go/pkg/api/errors"
+	"k8s.io/client-go/pkg/api/unversioned"
+	"k8s.io/client-go/pkg/apis/componentconfig"
+	"k8s.io/client-go/pkg/util/runtime"
+	"k8s.io/client-go/pkg/util/wait"
 
 	rl "github.com/aledbf/ingress-controller/pkg/k8s/client/leaderelection/resourcelock"
 

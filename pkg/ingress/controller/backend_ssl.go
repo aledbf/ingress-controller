@@ -21,9 +21,9 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/client-go/1.5/pkg/api"
-	extensions "k8s.io/client-go/1.5/pkg/apis/extensions/v1beta1"
-	"k8s.io/client-go/1.5/tools/cache"
+	"k8s.io/client-go/pkg/api"
+	extensions "k8s.io/client-go/pkg/apis/extensions/v1beta1"
+	"k8s.io/client-go/tools/cache"
 
 	"github.com/aledbf/ingress-controller/pkg/ingress"
 	"github.com/aledbf/ingress-controller/pkg/ingress/annotations/parser"
