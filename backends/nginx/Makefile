@@ -3,7 +3,7 @@ all: push
 BUILDTAGS=
 
 # 0.0 shouldn't clobber any release builds
-RELEASE = 0.9
+RELEASE?=0.9
 PREFIX = quay.io/aledbf/nginx-ingress-controller
 GOOS?=linux
 
