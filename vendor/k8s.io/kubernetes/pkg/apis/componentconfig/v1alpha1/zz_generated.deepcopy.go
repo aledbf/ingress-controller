@@ -314,6 +314,7 @@ func DeepCopy_v1alpha1_KubeletConfiguration(in interface{}, out interface{}, c *
 		out.RuntimeRequestTimeout = in.RuntimeRequestTimeout
 		out.RktPath = in.RktPath
 		out.ExperimentalMounterPath = in.ExperimentalMounterPath
+		out.ExperimentalMounterRootfsPath = in.ExperimentalMounterRootfsPath
 		out.RktAPIEndpoint = in.RktAPIEndpoint
 		out.RktStage1Image = in.RktStage1Image
 		if in.LockFilePath != nil {
@@ -456,6 +457,7 @@ func DeepCopy_v1alpha1_KubeletConfiguration(in interface{}, out interface{}, c *
 		} else {
 			out.AllowedUnsafeSysctls = nil
 		}
+		out.FeatureGates = in.FeatureGates
 		out.ExperimentalRuntimeIntegrationType = in.ExperimentalRuntimeIntegrationType
 		return nil
 	}

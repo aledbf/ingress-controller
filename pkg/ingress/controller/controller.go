@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/healthz"
 
 	"k8s.io/client-go/kubernetes"
+	typed_core "k8s.io/client-go/kubernetes/typed/core/v1"
 	types "k8s.io/client-go/pkg/api"
 	api "k8s.io/client-go/pkg/api/v1"
 	extensions "k8s.io/client-go/pkg/apis/extensions/v1beta1"
@@ -154,7 +155,7 @@ func newIngressController(config *Configuration) Interface {
 
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
-	eventBroadcaster.StartRecordingToSink(config.Client.Core().Events(config.Namespace))
+	eventBroadcaster.StartRecordingToSink(typed_core.EventSinkImpl{config.Client.Core().Events(config.Namespace)})
 
 	ic := GenericController{
 		cfg:             config,
@@ -321,7 +322,7 @@ func (ic GenericController) IngressClass() string {
 }
 
 // getSecret searchs for a secret in the local secrets Store
-func (ic *GenericController) getSecret(name string) (*types.Secret, error) {
+func (ic *GenericController) getSecret(name string) (*api.Secret, error) {
 	s, exists, err := ic.secrLister.Store.GetByKey(name)
 	if err != nil {
 		return nil, err
@@ -329,7 +330,7 @@ func (ic *GenericController) getSecret(name string) (*types.Secret, error) {
 	if !exists {
 		return nil, fmt.Errorf("secret %v was not found", name)
 	}
-	return s.(*types.Secret), nil
+	return s.(*api.Secret), nil
 }
 
 func (ic *GenericController) getConfigMap(ns, name string) (*api.ConfigMap, error) {
@@ -976,7 +977,9 @@ func (ic *GenericController) getEndpoints(
 	proto api.Protocol,
 	hz *healthcheck.Upstream) []ingress.UpstreamServer {
 	glog.V(3).Infof("getting endpoints for service %v/%v and port %v", s.Namespace, s.Name, servicePort.String())
-	ep, err := ic.endpLister.GetServiceEndpoints(s)
+	var out *types.Service
+	api.Convert_v1_Service_To_api_Service(s, out, nil)
+	ep, err := ic.endpLister.GetServiceEndpoints(out)
 	if err != nil {
 		glog.Warningf("unexpected error obtaining service endpoints: %v", err)
 		return []ingress.UpstreamServer{}

@@ -30,7 +30,7 @@ import (
 	"github.com/aledbf/ingress-controller/backends/nginx/pkg/config"
 	"github.com/aledbf/ingress-controller/pkg/ingress/defaults"
 
-	"k8s.io/client-go/pkg/api"
+	api "k8s.io/client-go/pkg/api/v1"
 )
 
 const (
