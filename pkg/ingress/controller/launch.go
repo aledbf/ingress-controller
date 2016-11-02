@@ -22,7 +22,6 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 
-	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/healthz"
 )
 
@@ -80,8 +79,6 @@ func NewIngressController(backend ingress.Controller) Interface {
 	flags.AddGoFlagSet(flag.CommandLine)
 	flags.Parse(os.Args)
 
-	clientConfig := kubectl_util.DefaultClientConfig()
-
 	flag.Set("logtostderr", "true")
 
 	glog.Info(backend.Info())
@@ -94,19 +91,19 @@ func NewIngressController(backend ingress.Controller) Interface {
 		glog.Fatalf("Please specify --default-backend-service")
 	}
 
-	kubeconfig, err := restclient.InClusterConfig()
+	// running inside the cluster?
+	kubeconfig, err := rest.InClusterConfig()
 	if err != nil {
-		config, err := clientcmd.BuildConfigFromFlags("", *kubeconfig)
-
-		kubeconfig, err = clientConfig.ClientConfig()
+		kc, err := clientcmd.DefaultClientConfig.ClientConfig()
 		if err != nil {
 			glog.Fatalf("error configuring the client: %v", err)
 		}
+		kubeconfig = kc
 	}
 
-	kubeClient, err := rest.New(kubeconfig)
+	kubeClient, err := kubernetes.NewForConfig(kubeconfig)
 	if err != nil {
-		glog.Fatalf("failed to create client: %v", err)
+		glog.Fatalf("error configuring the client: %v", err)
 	}
 
 	leaderElectionClient, err := kubernetes.NewForConfig(rest.AddUserAgent(kubeconfig, "leader-election"))

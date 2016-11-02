@@ -319,6 +319,8 @@ type KubeletConfiguration struct {
 	RktPath string `json:"rktPath,omitempty"`
 	// experimentalMounterPath is the path of mounter binary. Leave empty to use the default mount path
 	ExperimentalMounterPath string `json:"experimentalMounterPath,omitempty"`
+	// experimentalMounterRootfsPath is the absolute path to root filesystem for the mounter binary.
+	ExperimentalMounterRootfsPath string `json:"experimentalMounterRootfsPath,omitempty"`
 	// rktApiEndpoint is the endpoint of the rkt API service to communicate with.
 	// +optional
 	RktAPIEndpoint string `json:"rktAPIEndpoint,omitempty"`
@@ -450,6 +452,9 @@ type KubeletConfiguration struct {
 	// Whitelist of unsafe sysctls or sysctl patterns (ending in *).
 	// +optional
 	AllowedUnsafeSysctls []string `json:"experimentalAllowedUnsafeSysctls,omitempty"`
+	// featureGates is a string of comma-separated key=value pairs that describe feature
+	// gates for alpha/experimental features.
+	FeatureGates string `json:"featureGates"`
 	// How to integrate with runtime. If set to cri, kubelet will switch to
 	// using the new Container Runtine Interface.
 	// +optional
