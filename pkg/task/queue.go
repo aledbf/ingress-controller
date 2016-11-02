@@ -22,7 +22,7 @@ import (
 
 	"github.com/golang/glog"
 
-	"k8s.io/client-go/1.5/tools/cache"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/util/workqueue"
 )

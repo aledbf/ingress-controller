@@ -22,7 +22,7 @@ import (
 	"github.com/aledbf/ingress-controller/pkg/ingress/annotations/parser"
 	"github.com/aledbf/ingress-controller/pkg/ingress/defaults"
 
-	extensions "k8s.io/client-go/1.5/pkg/apis/extensions/v1beta1"
+	extensions "k8s.io/client-go/pkg/apis/extensions/v1beta1"
 )
 
 const (

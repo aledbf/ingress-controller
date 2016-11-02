@@ -29,12 +29,11 @@ import (
 	"github.com/aledbf/ingress-controller/pkg/task"
 
 	"github.com/aledbf/ingress-controller/pkg/k8s/client/leaderelection"
-	"k8s.io/client-go/1.5/kubernetes"
-	"k8s.io/client-go/1.5/pkg/api"
-	types "k8s.io/client-go/1.5/pkg/api/v1"
-	extensions "k8s.io/client-go/1.5/pkg/apis/extensions/v1beta1"
-	"k8s.io/client-go/1.5/pkg/labels"
-	"k8s.io/client-go/1.5/pkg/util/wait"
+	"k8s.io/client-go/kubernetes"
+	types "k8s.io/client-go/pkg/api/v1"
+	extensions "k8s.io/client-go/pkg/apis/extensions/v1beta1"
+	"k8s.io/client-go/pkg/labels"
+	"k8s.io/client-go/pkg/util/wait"
 )
 
 const (
@@ -199,8 +198,8 @@ func (s *statusSync) getRunningIPs() ([]string, error) {
 	}
 
 	// get information about all the pods running the ingress controller
-	pods, err := s.Client.Core().Pods(s.pod.Namespace).List(api.ListOptions{
-		LabelSelector: labels.SelectorFromSet(s.pod.Labels),
+	pods, err := s.Client.Core().Pods(s.pod.Namespace).List(types.ListOptions{
+		LabelSelector: labels.SelectorFromValidatedSet(labels.Set(s.pod.Labels)).String(),
 	})
 	if err != nil {
 		return nil, err

@@ -19,8 +19,8 @@ package k8s
 import (
 	"testing"
 
-	"k8s.io/client-go/1.5/kubernetes/fake"
-	"k8s.io/client-go/1.5/pkg/api"
+	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/client-go/pkg/api"
 )
 
 func TestParseNameNS(t *testing.T) {

@@ -22,7 +22,7 @@ import (
 	"github.com/aledbf/ingress-controller/pkg/ingress"
 	"github.com/aledbf/ingress-controller/pkg/ingress/annotations/parser"
 
-	extensions "k8s.io/client-go/1.5/pkg/apis/extensions/v1beta1"
+	extensions "k8s.io/client-go/pkg/apis/extensions/v1beta1"
 )
 
 // newDefaultServer return an UpstreamServer to be use as default server that returns 503.

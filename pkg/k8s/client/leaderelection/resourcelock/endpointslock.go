@@ -21,8 +21,8 @@ import (
 	"errors"
 	"fmt"
 
-	clientset "k8s.io/client-go/1.5/kubernetes"
-	api "k8s.io/client-go/1.5/pkg/api/v1"
+	clientset "k8s.io/client-go/kubernetes"
+	api "k8s.io/client-go/pkg/api/v1"
 )
 
 type EndpointsLock struct {
