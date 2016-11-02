@@ -26,9 +26,10 @@ import (
 
 	"github.com/aledbf/ingress-controller/pkg/ingress/annotations/service"
 
-	"k8s.io/kubernetes/pkg/api"
-	podutil "k8s.io/kubernetes/pkg/api/pod"
-	"k8s.io/kubernetes/pkg/labels"
+	types "k8s.io/client-go/1.5/pkg/api"
+	api "k8s.io/client-go/1.5/pkg/api/v1"
+	"k8s.io/client-go/1.5/pkg/labels"
+	"k8s.io/client-go/1.5/pkg/util/intstr"
 )
 
 // checkSvcForUpdate verifies if one of the running pods for a service contains
@@ -38,8 +39,8 @@ import (
 func (ic *GenericController) checkSvcForUpdate(svc *api.Service) error {
 	// get the pods associated with the service
 	// TODO: switch this to a watch
-	pods, err := ic.cfg.Client.Pods(svc.Namespace).List(api.ListOptions{
-		LabelSelector: labels.Set(svc.Spec.Selector).AsSelector(),
+	pods, err := ic.cfg.Client.Core().Pods(svc.Namespace).List(types.ListOptions{
+		LabelSelector: labels.SelectorFromValidatedSet(labels.Set(svc.Spec.Selector)),
 	})
 
 	if err != nil {
@@ -60,7 +61,7 @@ func (ic *GenericController) checkSvcForUpdate(svc *api.Service) error {
 
 		_, err := strconv.Atoi(servicePort.TargetPort.StrVal)
 		if err != nil {
-			portNum, err := podutil.FindPort(pod, servicePort)
+			portNum, err := findPort(pod, servicePort)
 			if err != nil {
 				glog.V(4).Infof("failed to find port for service %s/%s: %v", portNum, svc.Namespace, svc.Name, err)
 				continue
@@ -82,7 +83,7 @@ func (ic *GenericController) checkSvcForUpdate(svc *api.Service) error {
 	if len(namedPorts) > 0 && !reflect.DeepEqual(curNamedPort, namedPorts) {
 		data, _ := json.Marshal(namedPorts)
 
-		newSvc, err := ic.cfg.Client.Services(svc.Namespace).Get(svc.Name)
+		newSvc, err := ic.cfg.Client.Core().Services(svc.Namespace).Get(svc.Name)
 		if err != nil {
 			return fmt.Errorf("error getting service %v/%v: %v", svc.Namespace, svc.Name, err)
 		}
@@ -93,7 +94,7 @@ func (ic *GenericController) checkSvcForUpdate(svc *api.Service) error {
 
 		newSvc.ObjectMeta.Annotations[service.NamedPortAnnotation] = string(data)
 		glog.Infof("updating service %v with new named port mappings", svc.Name)
-		_, err = ic.cfg.Client.Services(svc.Namespace).Update(newSvc)
+		_, err = ic.cfg.Client.Core().Services(svc.Namespace).Update(newSvc)
 		if err != nil {
 			return fmt.Errorf("error syncing service %v/%v: %v", svc.Namespace, svc.Name, err)
 		}
@@ -102,4 +103,27 @@ func (ic *GenericController) checkSvcForUpdate(svc *api.Service) error {
 	}
 
 	return nil
+}
+
+// FindPort locates the container port for the given pod and portName.  If the
+// targetPort is a number, use that.  If the targetPort is a string, look that
+// string up in all named ports in all containers in the target pod.  If no
+// match is found, fail.
+func findPort(pod *api.Pod, svcPort *api.ServicePort) (int, error) {
+	portName := svcPort.TargetPort
+	switch portName.Type {
+	case intstr.String:
+		name := portName.StrVal
+		for _, container := range pod.Spec.Containers {
+			for _, port := range container.Ports {
+				if port.Name == name && port.Protocol == svcPort.Protocol {
+					return int(port.ContainerPort), nil
+				}
+			}
+		}
+	case intstr.Int:
+		return portName.IntValue(), nil
+	}
+
+	return 0, fmt.Errorf("no suitable port for manifest: %s", pod.UID)
 }

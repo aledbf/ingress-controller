@@ -19,8 +19,9 @@ package ratelimit
 import (
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/client-go/1.5/pkg/api"
+	extensions "k8s.io/client-go/1.5/pkg/apis/extensions/v1beta1"
+
 	"k8s.io/kubernetes/pkg/util/intstr"
 )
 

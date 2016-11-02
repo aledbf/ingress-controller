@@ -19,8 +19,8 @@ package k8s
 import (
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
+	"k8s.io/client-go/1.5/kubernetes/fake"
+	"k8s.io/client-go/1.5/pkg/api"
 )
 
 func TestParseNameNS(t *testing.T) {
@@ -56,7 +56,7 @@ func TestParseNameNS(t *testing.T) {
 }
 
 func TestIsValidService(t *testing.T) {
-	fk := testclient.NewSimpleFake(&api.Service{
+	fk := fake.NewSimpleFake(&api.Service{
 		ObjectMeta: api.ObjectMeta{
 			Namespace: api.NamespaceDefault,
 			Name:      "demo",
@@ -75,7 +75,7 @@ func TestIsValidService(t *testing.T) {
 		t.Errorf("expected a Service but retuned nil")
 	}
 
-	fk = testclient.NewSimpleFake()
+	fk = fake.NewSimpleFake()
 	s, err = IsValidService(fk, "default/demo")
 	if err == nil {
 		t.Errorf("expected an error but retuned nil")
@@ -86,7 +86,7 @@ func TestIsValidService(t *testing.T) {
 }
 
 func TestIsValidSecret(t *testing.T) {
-	fk := testclient.NewSimpleFake(&api.Secret{
+	fk := fake.NewSimpleFake(&api.Secret{
 		ObjectMeta: api.ObjectMeta{
 			Namespace: api.NamespaceDefault,
 			Name:      "demo",
@@ -105,7 +105,7 @@ func TestIsValidSecret(t *testing.T) {
 		t.Errorf("expected a Secret but retuned nil")
 	}
 
-	fk = testclient.NewSimpleFake()
+	fk = fake.NewSimpleFake()
 	s, err = IsValidSecret(fk, "default/demo")
 	if err == nil {
 		t.Errorf("expected an error but retuned nil")

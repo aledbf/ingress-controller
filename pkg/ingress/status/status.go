@@ -28,13 +28,13 @@ import (
 	strings "github.com/aledbf/ingress-controller/pkg/strings"
 	"github.com/aledbf/ingress-controller/pkg/task"
 
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apis/extensions"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	"k8s.io/kubernetes/pkg/client/leaderelection"
-	"k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/util/wait"
+	"github.com/aledbf/ingress-controller/pkg/k8s/client/leaderelection"
+	"k8s.io/client-go/1.5/kubernetes"
+	"k8s.io/client-go/1.5/pkg/api"
+	types "k8s.io/client-go/1.5/pkg/api/v1"
+	extensions "k8s.io/client-go/1.5/pkg/apis/extensions/v1beta1"
+	"k8s.io/client-go/1.5/pkg/labels"
+	"k8s.io/client-go/1.5/pkg/util/wait"
 )
 
 const (
@@ -49,8 +49,8 @@ type Sync interface {
 
 // Config ...
 type Config struct {
-	Client         *unversioned.Client
-	ElectionClient *clientset.Clientset
+	Client         kubernetes.Interface
+	ElectionClient *kubernetes.Clientset
 	PublishService string
 	IngressLister  cache_store.StoreToIngressLister
 }
@@ -107,7 +107,7 @@ func (s statusSync) Shutdown() {
 	}
 
 	glog.Infof("removing my ip (%v)", ips)
-	s.updateStatus([]api.LoadBalancerIngress{})
+	s.updateStatus([]types.LoadBalancerIngress{})
 }
 
 func (s *statusSync) run() {
@@ -185,7 +185,7 @@ func NewStatusSyncer(config Config) Sync {
 func (s *statusSync) getRunningIPs() ([]string, error) {
 	if s.PublishService != "" {
 		ns, name, _ := k8s.ParseNameNS(s.PublishService)
-		svc, err := s.Client.Services(ns).Get(name)
+		svc, err := s.Client.Core().Services(ns).Get(name)
 		if err != nil {
 			return nil, err
 		}
@@ -199,7 +199,7 @@ func (s *statusSync) getRunningIPs() ([]string, error) {
 	}
 
 	// get information about all the pods running the ingress controller
-	pods, err := s.Client.Pods(s.pod.Namespace).List(api.ListOptions{
+	pods, err := s.Client.Core().Pods(s.pod.Namespace).List(api.ListOptions{
 		LabelSelector: labels.SelectorFromSet(s.pod.Labels),
 	})
 	if err != nil {
@@ -215,17 +215,17 @@ func (s *statusSync) getRunningIPs() ([]string, error) {
 	return ips, nil
 }
 
-func sliceToStatus(ips []string) []api.LoadBalancerIngress {
-	lbi := []api.LoadBalancerIngress{}
+func sliceToStatus(ips []string) []types.LoadBalancerIngress {
+	lbi := []types.LoadBalancerIngress{}
 	for _, ip := range ips {
-		lbi = append(lbi, api.LoadBalancerIngress{IP: ip})
+		lbi = append(lbi, types.LoadBalancerIngress{IP: ip})
 	}
 
 	sort.Sort(loadBalancerIngressByIP(lbi))
 	return lbi
 }
 
-func (s *statusSync) updateStatus(newIPs []api.LoadBalancerIngress) {
+func (s *statusSync) updateStatus(newIPs []types.LoadBalancerIngress) {
 	ings := s.IngressLister.List()
 	var wg sync.WaitGroup
 	wg.Add(len(ings))
@@ -233,7 +233,7 @@ func (s *statusSync) updateStatus(newIPs []api.LoadBalancerIngress) {
 		ing := cur.(*extensions.Ingress)
 		go func(wg *sync.WaitGroup) {
 			defer wg.Done()
-			ingClient := s.Client.Extensions().Ingress(ing.Namespace)
+			ingClient := s.Client.Extensions().Ingresses(ing.Namespace)
 			currIng, err := ingClient.Get(ing.Name)
 			if err != nil {
 				glog.Errorf("unexpected error searching Ingress %v/%v: %v", ing.Namespace, ing.Name, err)
@@ -259,7 +259,7 @@ func (s *statusSync) updateStatus(newIPs []api.LoadBalancerIngress) {
 	wg.Wait()
 }
 
-func ingressSliceEqual(lhs, rhs []api.LoadBalancerIngress) bool {
+func ingressSliceEqual(lhs, rhs []types.LoadBalancerIngress) bool {
 	if len(lhs) != len(rhs) {
 		return false
 	}
@@ -276,7 +276,7 @@ func ingressSliceEqual(lhs, rhs []api.LoadBalancerIngress) bool {
 }
 
 // loadBalancerIngressByIP sorts LoadBalancerIngress using the field IP
-type loadBalancerIngressByIP []api.LoadBalancerIngress
+type loadBalancerIngressByIP []types.LoadBalancerIngress
 
 func (c loadBalancerIngressByIP) Len() int      { return len(c) }
 func (c loadBalancerIngressByIP) Swap(i, j int) { c[i], c[j] = c[j], c[i] }

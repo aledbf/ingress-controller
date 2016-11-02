@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"k8s.io/kubernetes/pkg/apis/extensions"
+	extensions "k8s.io/client-go/1.5/pkg/apis/extensions/v1beta1"
 )
 
 var (
