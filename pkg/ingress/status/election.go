@@ -103,13 +103,13 @@ func NewElection(electionID,
 	lock := resourcelock.EndpointsLock{
 		EndpointsMeta: api.ObjectMeta{Namespace: namespace, Name: electionID},
 		Client:        leaderElectionClient,
-		LockConfig: resourcelock.ResourceLockConfig{
+		LockConfig: resourcelock.Config{
 			Identity:      id,
 			EventRecorder: recorder,
 		},
 	}
 
-	config := leaderelection.LeaderElectionConfig{
+	config := leaderelection.Config{
 		Lock:          &lock,
 		LeaseDuration: ttl,
 		RenewDeadline: ttl / 2,

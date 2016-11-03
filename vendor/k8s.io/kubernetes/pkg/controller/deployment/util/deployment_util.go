@@ -36,7 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/integer"
-	intstrutil "k8s.io/kubernetes/pkg/util/intstr"
+	intstrutil "k8s.io/client-go/pkg/util/intstr"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
 	podutil "k8s.io/kubernetes/pkg/util/pod"
 	"k8s.io/kubernetes/pkg/util/wait"

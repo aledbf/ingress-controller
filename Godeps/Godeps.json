@@ -2750,7 +2750,7 @@
 			"Rev": "be5fe6df045d150892f548c9c7a425f46f3ccd3f"
 		},
 		{
-			"ImportPath": "k8s.io/kubernetes/pkg/util/intstr",
+			"ImportPath": "k8s.io/client-go/pkg/util/intstr",
 			"Comment": "v1.5.0-alpha.2-364-gbe5fe6d",
 			"Rev": "be5fe6df045d150892f548c9c7a425f46f3ccd3f"
 		},

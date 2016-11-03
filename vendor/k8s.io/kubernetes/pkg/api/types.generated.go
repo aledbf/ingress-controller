@@ -31,7 +31,7 @@ import (
 	pkg5_labels "k8s.io/kubernetes/pkg/labels"
 	pkg7_runtime "k8s.io/kubernetes/pkg/runtime"
 	pkg1_types "k8s.io/kubernetes/pkg/types"
-	pkg4_intstr "k8s.io/kubernetes/pkg/util/intstr"
+	pkg4_intstr "k8s.io/client-go/pkg/util/intstr"
 	"reflect"
 	"runtime"
 	time "time"

@@ -207,13 +207,13 @@ func TestTryAcquireOrRenew(t *testing.T) {
 
 		lock := rl.EndpointsLock{
 			EndpointsMeta: api.ObjectMeta{Namespace: "foo", Name: "bar"},
-			LockConfig: rl.ResourceLockConfig{
+			LockConfig: rl.Config{
 				Identity:      "baz",
 				EventRecorder: &record.FakeRecorder{},
 			},
 		}
 
-		lec := LeaderElectionConfig{
+		lec := Config{
 			Lock:          &lock,
 			LeaseDuration: 10 * time.Second,
 			Callbacks: LeaderCallbacks{

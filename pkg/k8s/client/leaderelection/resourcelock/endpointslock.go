@@ -25,15 +25,17 @@ import (
 	api "k8s.io/client-go/pkg/api/v1"
 )
 
+// EndpointsLock ...
 type EndpointsLock struct {
 	// EndpointsMeta should contain a Name and a Namespace of an
 	// Endpoints object that the LeaderElector will attempt to lead.
 	EndpointsMeta api.ObjectMeta
 	Client        clientset.Interface
-	LockConfig    ResourceLockConfig
+	LockConfig    Config
 	e             *api.Endpoints
 }
 
+// Get ...
 func (el *EndpointsLock) Get() (*LeaderElectionRecord, error) {
 	var record LeaderElectionRecord
 	var err error
@@ -96,7 +98,7 @@ func (el *EndpointsLock) Describe() string {
 	return fmt.Sprintf("%v/%v", el.EndpointsMeta.Namespace, el.EndpointsMeta.Name)
 }
 
-// returns the Identity of the lock
+// Identity returns the Identity of the lock
 func (el *EndpointsLock) Identity() string {
 	return el.LockConfig.Identity
 }

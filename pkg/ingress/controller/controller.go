@@ -157,7 +157,7 @@ func newIngressController(config *Configuration) Interface {
 
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
-	eventBroadcaster.StartRecordingToSink(typed_core.EventSinkImpl{config.Client.Core().Events(config.Namespace)})
+	eventBroadcaster.StartRecordingToSink(typed_core.EventSinkImpl{Interface: config.Client.Core().Events(config.Namespace)})
 
 	ic := GenericController{
 		cfg:             config,

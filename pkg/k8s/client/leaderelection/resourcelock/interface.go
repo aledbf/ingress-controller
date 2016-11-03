@@ -22,6 +22,7 @@ import (
 )
 
 const (
+	// LeaderElectionRecordAnnotationKey ...
 	LeaderElectionRecordAnnotationKey = "control-plane.alpha.kubernetes.io/leader"
 )
 
@@ -37,9 +38,9 @@ type LeaderElectionRecord struct {
 	LeaderTransitions    int              `json:"leaderTransitions"`
 }
 
-// ResourceLockConfig common data that exists across different
+// Config common data that exists across different
 // resource locks
-type ResourceLockConfig struct {
+type Config struct {
 	Identity      string
 	EventRecorder record.EventRecorder
 }
