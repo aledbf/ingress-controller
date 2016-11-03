@@ -36,8 +36,10 @@ import (
 	api "k8s.io/client-go/pkg/api/v1"
 	extensions "k8s.io/client-go/pkg/apis/extensions/v1beta1"
 	"k8s.io/client-go/pkg/fields"
+	"k8s.io/client-go/pkg/runtime"
 	"k8s.io/client-go/pkg/util/flowcontrol"
 	"k8s.io/client-go/pkg/util/intstr"
+	"k8s.io/client-go/pkg/watch"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 
@@ -253,26 +255,33 @@ func newIngressController(config *Configuration) Interface {
 	}
 
 	ic.ingLister.Store, ic.ingController = cache.NewInformer(
-		cache.NewListWatchFromClient(ic.cfg.Client.Core().RESTClient(), "ingress", ic.cfg.Namespace, fields.Everything()),
+		&cache.ListWatch{
+			ListFunc: func(options types.ListOptions) (runtime.Object, error) {
+				return ic.cfg.Client.Extensions().Ingresses(ic.cfg.Namespace).List(api.ListOptions{})
+			},
+			WatchFunc: func(options types.ListOptions) (watch.Interface, error) {
+				return ic.cfg.Client.Extensions().Ingresses(ic.cfg.Namespace).Watch(api.ListOptions{})
+			},
+		},
 		&extensions.Ingress{}, ic.cfg.ResyncPeriod, ingEventHandler)
 
 	ic.endpLister.Store, ic.endpController = cache.NewInformer(
-		cache.NewListWatchFromClient(ic.cfg.Client.Core().RESTClient(), "endpoint", ic.cfg.Namespace, fields.Everything()),
+		cache.NewListWatchFromClient(ic.cfg.Client.Core().RESTClient(), "endpoints", ic.cfg.Namespace, fields.Everything()),
 		&api.Endpoints{}, ic.cfg.ResyncPeriod, eventHandler)
 
 	ic.svcLister.Indexer, ic.svcController = cache.NewIndexerInformer(
-		cache.NewListWatchFromClient(ic.cfg.Client.Core().RESTClient(), "service", ic.cfg.Namespace, fields.Everything()),
+		cache.NewListWatchFromClient(ic.cfg.Client.Core().RESTClient(), "services", ic.cfg.Namespace, fields.Everything()),
 		&api.Service{},
 		ic.cfg.ResyncPeriod,
 		cache.ResourceEventHandlerFuncs{},
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 
 	ic.secrLister.Store, ic.secrController = cache.NewInformer(
-		cache.NewListWatchFromClient(ic.cfg.Client.Core().RESTClient(), "secret", ic.cfg.Namespace, fields.Everything()),
+		cache.NewListWatchFromClient(ic.cfg.Client.Core().RESTClient(), "secrets", ic.cfg.Namespace, fields.Everything()),
 		&api.Secret{}, ic.cfg.ResyncPeriod, secrEventHandler)
 
 	ic.mapLister.Store, ic.mapController = cache.NewInformer(
-		cache.NewListWatchFromClient(ic.cfg.Client.Core().RESTClient(), "configmap", ic.cfg.Namespace, fields.Everything()),
+		cache.NewListWatchFromClient(ic.cfg.Client.Core().RESTClient(), "configmaps", ic.cfg.Namespace, fields.Everything()),
 		&api.ConfigMap{}, ic.cfg.ResyncPeriod, mapEventHandler)
 
 	ic.syncStatus = status.NewStatusSyncer(status.Config{
@@ -977,7 +986,7 @@ func (ic *GenericController) getEndpoints(
 	proto api.Protocol,
 	hz *healthcheck.Upstream) []ingress.UpstreamServer {
 	glog.V(3).Infof("getting endpoints for service %v/%v and port %v", s.Namespace, s.Name, servicePort.String())
-	var out *types.Service
+	out := &types.Service{}
 	api.Convert_v1_Service_To_api_Service(s, out, nil)
 	ep, err := ic.endpLister.GetServiceEndpoints(out)
 	if err != nil {

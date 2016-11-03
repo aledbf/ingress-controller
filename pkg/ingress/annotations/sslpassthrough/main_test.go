@@ -19,9 +19,9 @@ package sslpassthrough
 import (
 	"testing"
 
-	"k8s.io/client-go/pkg/api"
+	api "k8s.io/client-go/pkg/api/v1"
 	extensions "k8s.io/client-go/pkg/apis/extensions/v1beta1"
-	"k8s.io/kubernetes/pkg/util/intstr"
+	"k8s.io/client-go/pkg/util/intstr"
 
 	"github.com/aledbf/ingress-controller/pkg/ingress/defaults"
 )

@@ -20,7 +20,7 @@ import (
 	"testing"
 
 	"k8s.io/client-go/kubernetes/fake"
-	"k8s.io/client-go/pkg/api"
+	api "k8s.io/client-go/pkg/api/v1"
 )
 
 func TestParseNameNS(t *testing.T) {
@@ -56,7 +56,7 @@ func TestParseNameNS(t *testing.T) {
 }
 
 func TestIsValidService(t *testing.T) {
-	fk := fake.NewSimpleFake(&api.Service{
+	fk := fake.NewSimpleClientset(&api.Service{
 		ObjectMeta: api.ObjectMeta{
 			Namespace: api.NamespaceDefault,
 			Name:      "demo",
@@ -75,7 +75,7 @@ func TestIsValidService(t *testing.T) {
 		t.Errorf("expected a Service but retuned nil")
 	}
 
-	fk = fake.NewSimpleFake()
+	fk = fake.NewSimpleClientset()
 	s, err = IsValidService(fk, "default/demo")
 	if err == nil {
 		t.Errorf("expected an error but retuned nil")
@@ -86,7 +86,7 @@ func TestIsValidService(t *testing.T) {
 }
 
 func TestIsValidSecret(t *testing.T) {
-	fk := fake.NewSimpleFake(&api.Secret{
+	fk := fake.NewSimpleClientset(&api.Secret{
 		ObjectMeta: api.ObjectMeta{
 			Namespace: api.NamespaceDefault,
 			Name:      "demo",
@@ -105,7 +105,7 @@ func TestIsValidSecret(t *testing.T) {
 		t.Errorf("expected a Secret but retuned nil")
 	}
 
-	fk = fake.NewSimpleFake()
+	fk = fake.NewSimpleClientset()
 	s, err = IsValidSecret(fk, "default/demo")
 	if err == nil {
 		t.Errorf("expected an error but retuned nil")
