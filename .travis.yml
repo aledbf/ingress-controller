@@ -13,8 +13,8 @@ go:
 
 env:
   global:
-  - ETCD_VERSION=3.0.12
-  - K8S_VERSION=1.4.4
+  - ETCD_VERSION=3.0.13
+  - K8S_VERSION=1.4.5
 
 before_install:
   - sudo bash -c 'sysctl net.ipv6.conf.all.disable_ipv6=0'
@@ -30,9 +30,7 @@ install:
   - go get github.com/modocache/gover
   - if ! go get github.com/golang/tools/cmd/cover; then go get golang.org/x/tools/cmd/cover; fi
 
-before_script:
-  - ./.travis/kubernetes/setup.sh
-  - ./.travis/kubernetes/kubectl version
-
 script:  
   - make fmt lint vet cover
+  - RELEASE="ci-$TRAVIS_BUILD_ID" make -c backend/nginx container push
+  - RELEASE="ci-$TRAVIS_BUILD_ID" BACKENDS=nginx make e2e

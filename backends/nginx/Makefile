@@ -3,8 +3,8 @@ all: push
 BUILDTAGS=
 
 # 0.0 shouldn't clobber any release builds
-RELEASE = 0.9
-PREFIX = quay.io/aledbf/nginx-ingress-controller
+RELEASE?=0.0
+PREFIX?=quay.io/aledbf/nginx-ingress-controller
 GOOS?=linux
 
 REPO_INFO=$(shell git config --get remote.origin.url)
@@ -20,10 +20,10 @@ build: clean
 		-ldflags "-s -w -X ${PKG}/pkg/version.RELEASE=${RELEASE} -X ${PKG}/pkg/version.COMMIT=${COMMIT} -X ${PKG}/pkg/version.REPO=${REPO_INFO}" \
 		-o rootfs/nginx-ingress-controller ${PKG}/pkg/cmd/controller
 
-container: build
+container:
 	docker build -t $(PREFIX):$(RELEASE) rootfs
 
-push: container
+push:
 	gcloud docker push $(PREFIX):$(RELEASE)
 
 fmt:
