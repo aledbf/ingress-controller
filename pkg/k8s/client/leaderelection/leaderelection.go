@@ -66,14 +66,18 @@ import (
 )
 
 const (
-	JitterFactor         = 1.2
+	// JitterFactor ...
+	JitterFactor = 1.2
+	// DefaultLeaseDuration ...
 	DefaultLeaseDuration = 15 * time.Second
+	// DefaultRenewDeadline ...
 	DefaultRenewDeadline = 10 * time.Second
-	DefaultRetryPeriod   = 2 * time.Second
+	// DefaultRetryPeriod ...
+	DefaultRetryPeriod = 2 * time.Second
 )
 
 // NewLeaderElector creates a LeaderElector from a LeaderElecitionConfig
-func NewLeaderElector(lec LeaderElectionConfig) (*LeaderElector, error) {
+func NewLeaderElector(lec Config) (*LeaderElector, error) {
 	if lec.LeaseDuration <= lec.RenewDeadline {
 		return nil, fmt.Errorf("leaseDuration must be greater than renewDeadline")
 	}
@@ -88,7 +92,8 @@ func NewLeaderElector(lec LeaderElectionConfig) (*LeaderElector, error) {
 	}, nil
 }
 
-type LeaderElectionConfig struct {
+// Config ...
+type Config struct {
 	// Lock is the resource that will be used for locking
 	Lock rl.Interface
 
@@ -130,7 +135,7 @@ type LeaderCallbacks struct {
 //  * (le *LeaderElector) IsLeader()
 //  * (le *LeaderElector) GetLeader()
 type LeaderElector struct {
-	config LeaderElectionConfig
+	config Config
 	// internal bookkeeping
 	observedRecord rl.LeaderElectionRecord
 	observedTime   time.Time
@@ -155,7 +160,7 @@ func (le *LeaderElector) Run() {
 
 // RunOrDie starts a client with the provided config or panics if the config
 // fails to validate.
-func RunOrDie(lec LeaderElectionConfig) {
+func RunOrDie(lec Config) {
 	le, err := NewLeaderElector(lec)
 	if err != nil {
 		panic(err)
@@ -267,16 +272,17 @@ func (le *LeaderElector) tryAcquireOrRenew() bool {
 	return true
 }
 
-func (l *LeaderElector) maybeReportTransition() {
-	if l.observedRecord.HolderIdentity == l.reportedLeader {
+func (le *LeaderElector) maybeReportTransition() {
+	if le.observedRecord.HolderIdentity == le.reportedLeader {
 		return
 	}
-	l.reportedLeader = l.observedRecord.HolderIdentity
-	if l.config.Callbacks.OnNewLeader != nil {
-		go l.config.Callbacks.OnNewLeader(l.reportedLeader)
+	le.reportedLeader = le.observedRecord.HolderIdentity
+	if le.config.Callbacks.OnNewLeader != nil {
+		go le.config.Callbacks.OnNewLeader(le.reportedLeader)
 	}
 }
 
+// DefaultLeaderElectionConfiguration ...
 func DefaultLeaderElectionConfiguration() componentconfig.LeaderElectionConfiguration {
 	return componentconfig.LeaderElectionConfiguration{
 		LeaderElect:   false,
