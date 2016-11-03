@@ -27,10 +27,10 @@ import (
 	"time"
 
 	fakeclientset "k8s.io/client-go/kubernetes/fake"
+	"k8s.io/client-go/pkg/api/errors"
 	"k8s.io/client-go/pkg/api/unversioned"
 	api "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/runtime"
-	"k8s.io/client-go/pkg/util/errors"
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/record"
 

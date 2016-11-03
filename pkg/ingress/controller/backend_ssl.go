@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"k8s.io/client-go/pkg/api"
+	types "k8s.io/client-go/pkg/api/v1"
 	extensions "k8s.io/client-go/pkg/apis/extensions/v1beta1"
 	"k8s.io/client-go/tools/cache"
 
@@ -75,7 +76,7 @@ func (ic *GenericController) syncSecret(k interface{}) error {
 	if !exists {
 		return fmt.Errorf("secret %v was not found", key)
 	}
-	sec := secObj.(*api.Secret)
+	sec := secObj.(*types.Secret)
 	if !ic.secrReferenced(sec.Name, sec.Namespace) {
 		glog.V(2).Infof("secret %v/%v is not used in Ingress rules. skipping ", sec.Namespace, sec.Name)
 		return nil
@@ -105,7 +106,7 @@ func (ic *GenericController) getPemCertificate(secretName string) (*ingress.SSLC
 		return nil, fmt.Errorf("secret named %v does not exists", secretName)
 	}
 
-	secret := secretInterface.(*api.Secret)
+	secret := secretInterface.(*types.Secret)
 	cert, ok := secret.Data[api.TLSCertKey]
 	if !ok {
 		return nil, fmt.Errorf("secret named %v has no private key", secretName)

@@ -23,9 +23,9 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/client-go/pkg/api"
+	api "k8s.io/client-go/pkg/api/v1"
 	extensions "k8s.io/client-go/pkg/apis/extensions/v1beta1"
-	"k8s.io/kubernetes/pkg/util/intstr"
+	"k8s.io/client-go/pkg/util/intstr"
 )
 
 func buildIngress() *extensions.Ingress {
