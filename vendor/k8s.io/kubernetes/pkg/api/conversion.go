@@ -25,7 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/client-go/pkg/util/intstr"
+	"k8s.io/kubernetes/pkg/util/intstr"
 	utillabels "k8s.io/kubernetes/pkg/util/labels"
 	"k8s.io/kubernetes/pkg/util/validation/field"
 )
