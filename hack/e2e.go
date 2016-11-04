@@ -57,9 +57,8 @@ func validWorkingDirectory() error {
 	if err != nil {
 		return fmt.Errorf("failed to convert %s to an absolute path: %v", cwd, err)
 	}
-	// This also matches "kubernetes_skew" for upgrades.
-	if !strings.Contains(filepath.Base(acwd), "kubernetes") {
-		return fmt.Errorf("must run from kubernetes directory root: %v", acwd)
+	if !strings.Contains(filepath.Base(acwd), "ingress-controller") {
+		return fmt.Errorf("must run from git root directory: %v", acwd)
 	}
 	return nil
 }
@@ -218,7 +217,7 @@ func Build() error {
 	cmd := exec.Command("make", "backends", "backends-images", "backends-push")
 	cmd.Stdin = os.Stdin
 	if err := finishRunning("build-release", cmd); err != nil {
-		return fmt.Errorf("error building kubernetes: %v", err)
+		return fmt.Errorf("error building: %v", err)
 	}
 	return nil
 }

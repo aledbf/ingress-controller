@@ -5,7 +5,7 @@
 set -eof pipefail
 
 # include env
-. ./e2e-env.sh
+. hack/e2e-internal/e2e-env.sh
 
 echo "Starting etcd..."
 docker run -d \

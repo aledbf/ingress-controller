@@ -32,5 +32,5 @@ install:
 
 script:  
   - make fmt lint vet cover
-  - RELEASE="ci-$TRAVIS_BUILD_ID" make -c backend/nginx container push
+  - RELEASE="ci-$TRAVIS_BUILD_ID" make backends backends-images backends-push
   - RELEASE="ci-$TRAVIS_BUILD_ID" BACKENDS=nginx make e2e

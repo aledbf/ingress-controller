@@ -58,7 +58,7 @@ test: fmt lint vet
 #   make test-e2e
 .PHONY: test-e2e
 test-e2e: ginkgo
-	go run hack/e2e.go -v --up --test --down
+	@go run hack/e2e.go -v --up --test --down
 
 .PHONY: cover
 cover:
@@ -87,3 +87,11 @@ backends-images:
 .PHONY: backends-push
 backends-push:
 	make -C backends/nginx push
+
+# Build ginkgo
+#
+# Example:
+# make ginkgo
+.PHONY: ginkgo
+ginkgo:
+	go get github.com/onsi/ginkgo/ginkgo
