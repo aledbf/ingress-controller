@@ -36,10 +36,8 @@ import (
 	api "k8s.io/client-go/pkg/api/v1"
 	extensions "k8s.io/client-go/pkg/apis/extensions/v1beta1"
 	"k8s.io/client-go/pkg/fields"
-	"k8s.io/client-go/pkg/runtime"
 	"k8s.io/client-go/pkg/util/flowcontrol"
 	"k8s.io/client-go/pkg/util/intstr"
-	"k8s.io/client-go/pkg/watch"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 
@@ -255,26 +253,12 @@ func newIngressController(config *Configuration) Interface {
 	}
 
 	ic.ingLister.Store, ic.ingController = cache.NewInformer(
-		&cache.ListWatch{
-			ListFunc: func(options types.ListOptions) (runtime.Object, error) {
-				return ic.cfg.Client.Extensions().Ingresses(ic.cfg.Namespace).List(api.ListOptions{})
-			},
-			WatchFunc: func(options types.ListOptions) (watch.Interface, error) {
-				return ic.cfg.Client.Extensions().Ingresses(ic.cfg.Namespace).Watch(api.ListOptions{})
-			},
-		},
+		cache.NewListWatchFromClient(ic.cfg.Client.Extensions().RESTClient(), "ingresses", ic.cfg.Namespace, fields.Everything()),
 		&extensions.Ingress{}, ic.cfg.ResyncPeriod, ingEventHandler)
 
 	ic.endpLister.Store, ic.endpController = cache.NewInformer(
 		cache.NewListWatchFromClient(ic.cfg.Client.Core().RESTClient(), "endpoints", ic.cfg.Namespace, fields.Everything()),
 		&api.Endpoints{}, ic.cfg.ResyncPeriod, eventHandler)
-
-	ic.svcLister.Indexer, ic.svcController = cache.NewIndexerInformer(
-		cache.NewListWatchFromClient(ic.cfg.Client.Core().RESTClient(), "services", ic.cfg.Namespace, fields.Everything()),
-		&api.Service{},
-		ic.cfg.ResyncPeriod,
-		cache.ResourceEventHandlerFuncs{},
-		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 
 	ic.secrLister.Store, ic.secrController = cache.NewInformer(
 		cache.NewListWatchFromClient(ic.cfg.Client.Core().RESTClient(), "secrets", ic.cfg.Namespace, fields.Everything()),
@@ -283,6 +267,13 @@ func newIngressController(config *Configuration) Interface {
 	ic.mapLister.Store, ic.mapController = cache.NewInformer(
 		cache.NewListWatchFromClient(ic.cfg.Client.Core().RESTClient(), "configmaps", ic.cfg.Namespace, fields.Everything()),
 		&api.ConfigMap{}, ic.cfg.ResyncPeriod, mapEventHandler)
+
+	ic.svcLister.Indexer, ic.svcController = cache.NewIndexerInformer(
+		cache.NewListWatchFromClient(ic.cfg.Client.Core().RESTClient(), "services", ic.cfg.Namespace, fields.Everything()),
+		&api.Service{},
+		ic.cfg.ResyncPeriod,
+		cache.ResourceEventHandlerFuncs{},
+		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 
 	ic.syncStatus = status.NewStatusSyncer(status.Config{
 		Client:         config.Client,
