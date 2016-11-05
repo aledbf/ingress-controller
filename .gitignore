@@ -1,2 +1,4 @@
 nginx-ingress-controller
 */**/.coverprofile
+hack/e2e-internal/kubectl
+

@@ -13,13 +13,13 @@ go:
 
 env:
   global:
-  - ETCD_VERSION=3.0.12
-  - K8S_VERSION=1.4.4
+    - secure: "naYpk5GShxDgstdQZwMZ0/UTPI+XZa9I3zxKH3ws0Iydp4UF/LCj7Yf0U+GtJ+q2vjPUKiHsZzBEWZcAmZh+Gp3s0ocYg+5FNdQS8Pp8Gd3peQk/1HfXvDO14JGBWz9pMDDOYYY2gKXLzNpL4YGGk8VGm93tz3aJNN0UhR+kOZTiqdzgSs3AliOuWHUz9ArymKaSqE69F76zceG9CpnSODUxJ54/iYtqRPiGqn0U6HzW6/J1Wh9N42qlt1QjwZOahYILe98eOwX3TDQ1KkEWNk2/dsSrMR6gRwIqpIWbOMx8MQejY+CE9+ME/9iNnSD9899cuXtRNXFP+TJy/2o3VqWdSN28ePgAe0M6PSKACBzphjkEkc8IqDvAyFE2OFbutkaj9VCs7ZJbyWZeIOh2tb1ttnfi30G+z6E2188q/gDMlTQ8HtM3AdnvMf+5v2bIw2K44Y+CNAxkKUaGYlpOC9vOqVKAQb3B1wINGdjia317iSeJVqgvZ4vlXnoUkWgoZEK601z66OuDGU09lBzfOL7rkQQZeGSN3k7W808Z03DPWRGNemSqRh5+A/iGjywKQ517oSgNkqhTqZ2Wcmt39F0TtKHA5XANaey3ESEDuOG/mvhksJU1cG+F+oYa33pMmF1jloUX5YD6MFSoyRTRnqW+x0TMKBdQMXojgtQ01T0="
+    - secure: "HdRtLty7qs5FL20rsyCRCbBHLXq+7AcPkjB2N2HbG7TbE0g/WNV41vWPUtlkwm6XaF91xegG3/ojKGdfPwAlXTTjnwh6ytgR6fga3EdGOA39lb6HjHQ+I73nUyNgIyOzehZtoXnex0wtiuJXNcF7M0PDn8kywFDb7G/6MYC074wkQp6ZNJuM5uoFQdi0u7PiG7Fx3732sFbrL/7ZWmxIXpg+gHK6saZDFb3AyPyQyu+TwHTRswMTUBlwPSgH15W76jVQdSBSaSeXLJqGXSJhznqbRaQY0acpdPZBSW6vwFvGTU+kGM841LUXCqPQqNbzpHjJRc6KuhvtZ9206l10gie4aVdqrcvBqra/51MxhQkREhLvmzK5qEB3KUX5DcTwAu7eoCe31BfPmRPHSDUkcNdj9f2sgwp4viOgPORQN5aS5cLzsyr4H6kBYVwCg5KlWIXfMDd1FjS+HoJW8CVaXqjfl3qbG/DjWxu0FMMq1bdkW/rw2bHMMDUozKJWFZeLHaTAhBignH1Zl0RMOfQeI9CdF3Lc9U7RiKzHVdzIHrcvPXgTLlHHqgTb38JqDptze8Nz3A+koA+dOVctoWM3ZhqkLysuiiMFPqYSa/A6DHPLJlkIIxQ0BCi2ptLwGUQRCx6k91SMvpb5BXw37W2vuoCAPUzJUIvT1VjB8oKWPJs="
+    - secure: "M1oGMQWOJVXSdzrfg0cIkIdeAPoAaooBQjd9jcY5ReGxTp0/LFJr5xwLKrC3/fnru7dDVAEzV6PRPlcx7+mcQY7jd5UoYQWCNNah9yArv7+q0LqV+IhCj8TmE4TW3VwEY9HdPRZtmb+lcqF+6biqC8r98yoX0xmFO8bBzGOXG/dCeEnIaGz6pUn169LI7iOfLN2SNs6OFBjoLf622IzJE0VK+YoIJE7trJUIWUYvGWUaK6RluZ+TjSh5yOsb4jiILoOOnPGnpr9Hi/bRg1YGYKZYPEpbOkpjJ34sxEVY8DIlKcR6BlZ0r9Js0G4AJnN6hy0sf7w0MSbf1hI5cjxt7KdFTe2Iq1dEaofibm8xxWVzWElsjter1IIcmHwJNvofivdzHSk5j3TB0x7RAZ3ntNM2ueFXJSBM2LAe34TcQ9a2kKYyqKMQzFL8AV0stOwmmktduYohJQYfDaE1VtujqXLbdhGeiYwavQcPwDLjIxVUyVb7BCxX38lgZKTWo2l0EWrlKXkfb7dg3pQxCUYqQYqLQ6VJKWu8D1emnPFm6ebaSRKIy4ThXK3Fdhll1csUSovX6apz3RN+nhEDbUHDeeYGLs9nXo48cVXhpl0cjvJgT8tRsPrvRYb4BOzAVRqsn5tin+T/WhVVLDsrfND9mCWgRURcOdAKolFaf2jW+9Y="
+    - RELEASE="ci-${TRAVIS_BUILD_ID}"
 
 before_install:
-  - sudo bash -c 'sysctl net.ipv6.conf.all.disable_ipv6=0'
-  - sudo bash -c 'sysctl net.ipv6.conf.default.disable_ipv6=0'
-  - sudo bash -c 'sysctl net.ipv6.conf.lo.disable_ipv6=0'
+  # required to run tests
   - sudo mkdir -p /ingress-controller/ssl
   - sudo chmod 777 -R /ingress-controller
 
@@ -30,9 +30,8 @@ install:
   - go get github.com/modocache/gover
   - if ! go get github.com/golang/tools/cmd/cover; then go get golang.org/x/tools/cmd/cover; fi
 
-before_script:
-  - ./.travis/kubernetes/setup.sh
-  - ./.travis/kubernetes/kubectl version
-
 script:  
   - make fmt lint vet cover
+  - docker login -u $DOCKER_USER -p $DOCKER_PASS quay.io
+  - make backends backends-images backends-push
+  - make test-e2e
