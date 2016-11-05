@@ -40,8 +40,8 @@ type PodDisruptionBudgetSpec struct {
 // PodDisruptionBudgetStatus represents information about the status of a
 // PodDisruptionBudget. Status may trail the actual state of a system.
 type PodDisruptionBudgetStatus struct {
-	// Whether or not a disruption is currently allowed.
-	PodDisruptionAllowed bool `json:"disruptionAllowed"`
+	// Number of pod disruptions that are currently allowed.
+	PodDisruptionsAllowed int32 `json:"disruptionsAllowed"`
 
 	// current number of healthy pods
 	CurrentHealthy int32 `json:"currentHealthy"`
@@ -79,7 +79,7 @@ type PodDisruptionBudgetList struct {
 
 // Eviction evicts a pod from its node subject to certain policies and safety constraints.
 // This is a subresource of Pod.  A request to cause such an eviction is
-// created by POSTing to .../pods/<pod name>/evictions.
+// created by POSTing to .../pods/<pod name>/eviction.
 type Eviction struct {
 	unversioned.TypeMeta `json:",inline"`
 
