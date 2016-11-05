@@ -170,6 +170,10 @@ const (
 
 	// TODO(justinsb): Avoid hardcoding this.
 	awsMasterIP = "172.20.0.9"
+
+	// Default time to wait for nodes to become schedulable.
+	// Set so high for scale tests.
+	NodeSchedulableTimeout = 4 * time.Hour
 )
 
 var (
@@ -1404,27 +1408,6 @@ func WaitForRCToStabilize(c clientset.Interface, ns, name string, timeout time.D
 	return err
 }
 
-// WaitForPodAddition waits for pods to be added within the timeout.
-func WaitForPodAddition(c clientset.Interface, ns string, timeout time.Duration) error {
-	options := api.ListOptions{FieldSelector: fields.Set{
-		"metadata.namespace": ns,
-	}.AsSelector()}
-
-	w, err := c.Core().Pods(ns).Watch(options)
-	if err != nil {
-		return err
-	}
-	_, err = watch.Until(timeout, w, func(event watch.Event) (bool, error) {
-		switch event.Type {
-		case watch.Added:
-			return true, nil
-		}
-		Logf("Waiting for pod(s) to be added in namespace %v", ns)
-		return false, nil
-	})
-	return err
-}
-
 func WaitForPodToDisappear(c clientset.Interface, ns, podName string, label labels.Selector, interval, timeout time.Duration) error {
 	return wait.PollImmediate(interval, timeout, func() (bool, error) {
 		Logf("Waiting for pod %s to disappear", podName)
@@ -2437,11 +2420,11 @@ func GetReadySchedulableNodesOrDie(c clientset.Interface) (nodes *api.NodeList) 
 	return nodes
 }
 
-func WaitForAllNodesSchedulable(c clientset.Interface) error {
-	Logf("Waiting up to %v for all (but %d) nodes to be schedulable", 4*time.Hour, TestContext.AllowedNotReadyNodes)
+func WaitForAllNodesSchedulable(c clientset.Interface, timeout time.Duration) error {
+	Logf("Waiting up to %v for all (but %d) nodes to be schedulable", timeout, TestContext.AllowedNotReadyNodes)
 
 	var notSchedulable []*api.Node
-	return wait.PollImmediate(30*time.Second, 4*time.Hour, func() (bool, error) {
+	return wait.PollImmediate(30*time.Second, timeout, func() (bool, error) {
 		notSchedulable = nil
 		opts := api.ListOptions{
 			ResourceVersion: "0",
@@ -3194,6 +3177,23 @@ func WaitForObservedDeployment(c clientset.Interface, ns, deploymentName string,
 	return deploymentutil.WaitForObservedDeployment(func() (*extensions.Deployment, error) { return c.Extensions().Deployments(ns).Get(deploymentName) }, desiredGeneration, Poll, 1*time.Minute)
 }
 
+func WaitForDeploymentWithCondition(c clientset.Interface, ns, deploymentName, reason string, condType extensions.DeploymentConditionType) error {
+	var conditions []extensions.DeploymentCondition
+	pollErr := wait.PollImmediate(time.Second, 1*time.Minute, func() (bool, error) {
+		deployment, err := c.Extensions().Deployments(ns).Get(deploymentName)
+		if err != nil {
+			return false, err
+		}
+		conditions = deployment.Status.Conditions
+		cond := deploymentutil.GetDeploymentCondition(deployment.Status, condType)
+		return cond != nil && cond.Reason == reason, nil
+	})
+	if pollErr == wait.ErrWaitTimeout {
+		pollErr = fmt.Errorf("deployment %q never updated with the desired condition and reason: %v", deploymentName, conditions)
+	}
+	return pollErr
+}
+
 func logPodsOfDeployment(c clientset.Interface, deployment *extensions.Deployment) {
 	minReadySeconds := deployment.Spec.MinReadySeconds
 	podList, err := deploymentutil.ListPods(deployment,
@@ -3253,7 +3253,8 @@ type updateDeploymentFunc func(d *extensions.Deployment)
 
 func UpdateDeploymentWithRetries(c clientset.Interface, namespace, name string, applyUpdate updateDeploymentFunc) (deployment *extensions.Deployment, err error) {
 	deployments := c.Extensions().Deployments(namespace)
-	err = wait.Poll(10*time.Millisecond, 1*time.Minute, func() (bool, error) {
+	var updateErr error
+	pollErr := wait.Poll(10*time.Millisecond, 1*time.Minute, func() (bool, error) {
 		if deployment, err = deployments.Get(name); err != nil {
 			return false, err
 		}
@@ -3263,9 +3264,63 @@ func UpdateDeploymentWithRetries(c clientset.Interface, namespace, name string, 
 			Logf("Updating deployment %s", name)
 			return true, nil
 		}
+		updateErr = err
 		return false, nil
 	})
-	return deployment, err
+	if pollErr == wait.ErrWaitTimeout {
+		pollErr = fmt.Errorf("couldn't apply the provided updated to deployment %q: %v", name, updateErr)
+	}
+	return deployment, pollErr
+}
+
+type updateRsFunc func(d *extensions.ReplicaSet)
+
+func UpdateReplicaSetWithRetries(c clientset.Interface, namespace, name string, applyUpdate updateRsFunc) (*extensions.ReplicaSet, error) {
+	var rs *extensions.ReplicaSet
+	var updateErr error
+	pollErr := wait.PollImmediate(10*time.Millisecond, 1*time.Minute, func() (bool, error) {
+		var err error
+		if rs, err = c.Extensions().ReplicaSets(namespace).Get(name); err != nil {
+			return false, err
+		}
+		// Apply the update, then attempt to push it to the apiserver.
+		applyUpdate(rs)
+		if rs, err = c.Extensions().ReplicaSets(namespace).Update(rs); err == nil {
+			Logf("Updating replica set %q", name)
+			return true, nil
+		}
+		updateErr = err
+		return false, nil
+	})
+	if pollErr == wait.ErrWaitTimeout {
+		pollErr = fmt.Errorf("couldn't apply the provided updated to replicaset %q: %v", name, updateErr)
+	}
+	return rs, pollErr
+}
+
+type updateRcFunc func(d *api.ReplicationController)
+
+func UpdateReplicationControllerWithRetries(c clientset.Interface, namespace, name string, applyUpdate updateRcFunc) (*api.ReplicationController, error) {
+	var rc *api.ReplicationController
+	var updateErr error
+	pollErr := wait.PollImmediate(10*time.Millisecond, 1*time.Minute, func() (bool, error) {
+		var err error
+		if rc, err = c.Core().ReplicationControllers(namespace).Get(name); err != nil {
+			return false, err
+		}
+		// Apply the update, then attempt to push it to the apiserver.
+		applyUpdate(rc)
+		if rc, err = c.Core().ReplicationControllers(namespace).Update(rc); err == nil {
+			Logf("Updating replication controller %q", name)
+			return true, nil
+		}
+		updateErr = err
+		return false, nil
+	})
+	if pollErr == wait.ErrWaitTimeout {
+		pollErr = fmt.Errorf("couldn't apply the provided updated to rc %q: %v", name, updateErr)
+	}
+	return rc, pollErr
 }
 
 // NodeAddresses returns the first address of the given type of each node.
@@ -3353,7 +3408,7 @@ func LogSSHResult(result SSHResult) {
 	Logf("ssh %s: exit code: %d", remote, result.Code)
 }
 
-func IssueSSHCommand(cmd, provider string, node *api.Node) error {
+func IssueSSHCommandWithResult(cmd, provider string, node *api.Node) (*SSHResult, error) {
 	Logf("Getting external IP address for %s", node.Name)
 	host := ""
 	for _, a := range node.Status.Addresses {
@@ -3362,15 +3417,34 @@ func IssueSSHCommand(cmd, provider string, node *api.Node) error {
 			break
 		}
 	}
+
 	if host == "" {
-		return fmt.Errorf("couldn't find external IP address for node %s", node.Name)
+		return nil, fmt.Errorf("couldn't find external IP address for node %s", node.Name)
 	}
-	Logf("Calling %s on %s(%s)", cmd, node.Name, host)
+
+	Logf("SSH %q on %s(%s)", cmd, node.Name, host)
 	result, err := SSH(cmd, host, provider)
 	LogSSHResult(result)
+
 	if result.Code != 0 || err != nil {
-		return fmt.Errorf("failed running %q: %v (exit code %d)", cmd, err, result.Code)
+		return nil, fmt.Errorf("failed running %q: %v (exit code %d)",
+			cmd, err, result.Code)
 	}
+
+	return &result, nil
+}
+
+func IssueSSHCommand(cmd, provider string, node *api.Node) error {
+	result, err := IssueSSHCommandWithResult(cmd, provider, node)
+	if result != nil {
+		LogSSHResult(*result)
+	}
+
+	if result.Code != 0 || err != nil {
+		return fmt.Errorf("failed running %q: %v (exit code %d)",
+			cmd, err, result.Code)
+	}
+
 	return nil
 }
 

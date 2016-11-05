@@ -23,7 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/client-go/pkg/util/intstr"
+	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
 // Common string formats

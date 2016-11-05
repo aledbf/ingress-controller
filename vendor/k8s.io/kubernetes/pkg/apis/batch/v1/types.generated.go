@@ -29,7 +29,7 @@ import (
 	pkg1_unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	pkg2_v1 "k8s.io/kubernetes/pkg/api/v1"
 	pkg3_types "k8s.io/kubernetes/pkg/types"
-	pkg5_intstr "k8s.io/client-go/pkg/util/intstr"
+	pkg5_intstr "k8s.io/kubernetes/pkg/util/intstr"
 	"reflect"
 	"runtime"
 	time "time"

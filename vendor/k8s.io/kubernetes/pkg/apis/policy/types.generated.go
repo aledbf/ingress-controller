@@ -28,7 +28,7 @@ import (
 	pkg3_api "k8s.io/kubernetes/pkg/api"
 	pkg2_unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	pkg4_types "k8s.io/kubernetes/pkg/types"
-	pkg1_intstr "k8s.io/client-go/pkg/util/intstr"
+	pkg1_intstr "k8s.io/kubernetes/pkg/util/intstr"
 	"reflect"
 	"runtime"
 	time "time"
@@ -384,17 +384,17 @@ func (x *PodDisruptionBudgetStatus) CodecEncodeSelf(e *codec1978.Encoder) {
 				_ = yym26
 				if false {
 				} else {
-					r.EncodeBool(bool(x.PodDisruptionAllowed))
+					r.EncodeInt(int64(x.PodDisruptionsAllowed))
 				}
 			} else {
 				z.EncSendContainerState(codecSelfer_containerMapKey1234)
-				r.EncodeString(codecSelferC_UTF81234, string("disruptionAllowed"))
+				r.EncodeString(codecSelferC_UTF81234, string("disruptionsAllowed"))
 				z.EncSendContainerState(codecSelfer_containerMapValue1234)
 				yym27 := z.EncBinary()
 				_ = yym27
 				if false {
 				} else {
-					r.EncodeBool(bool(x.PodDisruptionAllowed))
+					r.EncodeInt(int64(x.PodDisruptionsAllowed))
 				}
 			}
 			if yyr24 || yy2arr24 {
@@ -515,11 +515,11 @@ func (x *PodDisruptionBudgetStatus) codecDecodeSelfFromMap(l int, d *codec1978.D
 		yys39 := string(yys39Slc)
 		z.DecSendContainerState(codecSelfer_containerMapValue1234)
 		switch yys39 {
-		case "disruptionAllowed":
+		case "disruptionsAllowed":
 			if r.TryDecodeAsNil() {
-				x.PodDisruptionAllowed = false
+				x.PodDisruptionsAllowed = 0
 			} else {
-				x.PodDisruptionAllowed = bool(r.DecodeBool())
+				x.PodDisruptionsAllowed = int32(r.DecodeInt(32))
 			}
 		case "currentHealthy":
 			if r.TryDecodeAsNil() {
@@ -565,9 +565,9 @@ func (x *PodDisruptionBudgetStatus) codecDecodeSelfFromArray(l int, d *codec1978
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.PodDisruptionAllowed = false
+		x.PodDisruptionsAllowed = 0
 	} else {
-		x.PodDisruptionAllowed = bool(r.DecodeBool())
+		x.PodDisruptionsAllowed = int32(r.DecodeInt(32))
 	}
 	yyj44++
 	if yyhl44 {

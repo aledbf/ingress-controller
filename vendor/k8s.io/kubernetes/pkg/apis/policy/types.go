@@ -19,7 +19,7 @@ package policy
 import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/client-go/pkg/util/intstr"
+	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
 // PodDisruptionBudgetSpec is a description of a PodDisruptionBudget.
@@ -40,8 +40,8 @@ type PodDisruptionBudgetSpec struct {
 // PodDisruptionBudgetStatus represents information about the status of a
 // PodDisruptionBudget. Status may trail the actual state of a system.
 type PodDisruptionBudgetStatus struct {
-	// Whether or not a disruption is currently allowed.
-	PodDisruptionAllowed bool `json:"disruptionAllowed"`
+	// Number of pod disruptions that are currently allowed.
+	PodDisruptionsAllowed int32 `json:"disruptionsAllowed"`
 
 	// current number of healthy pods
 	CurrentHealthy int32 `json:"currentHealthy"`

@@ -27,7 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/client-go/pkg/util/intstr"
+	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
 func addConversionFuncs(scheme *runtime.Scheme) error {

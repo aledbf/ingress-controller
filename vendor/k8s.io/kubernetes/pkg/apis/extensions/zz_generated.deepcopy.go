@@ -25,7 +25,7 @@ import (
 	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	conversion "k8s.io/kubernetes/pkg/conversion"
 	runtime "k8s.io/kubernetes/pkg/runtime"
-	intstr "k8s.io/client-go/pkg/util/intstr"
+	intstr "k8s.io/kubernetes/pkg/util/intstr"
 	reflect "reflect"
 )
 
