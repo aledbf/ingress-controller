@@ -258,14 +258,14 @@ func (b bash) Down() error {
 
 func DumpClusterLogs(location string) error {
 	log.Printf("Dumping cluster logs to: %v", location)
-	return finishRunning("dump cluster logs", exec.Command("./cluster/log-dump.sh", location))
+	return finishRunning("dump cluster logs", exec.Command("./hack/e2e-internal/log-dump.sh", location))
 }
 
 func Test() error {
 	if *testArgs == "" {
-		*testArgs = "--ginkgo.focus=\\[Feature:Federation\\]"
+		*testArgs = "--ginkgo.focus=\\[Feature:Ingress\\]"
 	}
-	return finishRunning("Ginkgo tests", exec.Command("./hack/federated-ginkgo-e2e.sh", strings.Fields(*testArgs)...))
+	return finishRunning("Ginkgo tests", exec.Command("./hack/e2e-internal/ginkgo-e2e.sh", strings.Fields(*testArgs)...))
 }
 
 func finishRunning(stepName string, cmd *exec.Cmd) error {

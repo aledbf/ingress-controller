@@ -47,7 +47,6 @@ var _ = framework.KubeDescribe("Ingress controllers: [Feature:Ingress]", func() 
 		var nginxController *NginxIngressController
 
 		BeforeEach(func() {
-			framework.SkipUnlessProviderIs("gce", "gke")
 			By("Initializing nginx controller")
 			jig.class = "nginx"
 			nginxController = &NginxIngressController{ns: ns, c: jig.client}

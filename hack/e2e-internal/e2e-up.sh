@@ -16,7 +16,9 @@ docker run -d \
 echo "Starting kubernetes..."
 
 docker run -d --name=apiserver \
-    --net=host --pid=host --privileged=true \
+    --net=host \
+    --pid=host \
+    --privileged=true \
     gcr.io/google_containers/hyperkube:v${K8S_VERSION} \
     /hyperkube apiserver \
     --insecure-bind-address=0.0.0.0 \
@@ -29,7 +31,7 @@ docker run -d --name=kubelet \
     --volume=/sys:/sys:ro \
     --volume=/dev:/dev \
     --volume=/var/lib/docker/:/var/lib/docker:rw \
-    --volume=/private/var/lib/kubelet/:/var/lib/kubelet:rw \
+    --volume=/var/lib/kubelet/:/var/lib/kubelet:rw \
     --volume=/var/run:/var/run:rw \
     --net=host \
     --pid=host \
