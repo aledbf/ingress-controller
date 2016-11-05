@@ -11,8 +11,6 @@ echo "running ginkgo"
 
 export PATH="${BASEDIR}/..":"${PATH}"
 ginkgo -r \
-    --ginkgo.flakeAttempts=2 \
-    --repo-root="${BASEDIR}/.." \
-    --prefix=e2e \
-    --clean-start=true \
+    --flakeAttempts=2 \
+    -keepGoing \
     "${@:-}"
