@@ -214,7 +214,7 @@ func run(deploy deployer) error {
 func Build() error {
 	// The build-release script needs stdin to ask the user whether
 	// it's OK to download the docker image.
-	cmd := exec.Command("make", "backends", "backends-images", "backends-push")
+	cmd := exec.Command("make", "backends", "backends-images")
 	cmd.Stdin = os.Stdin
 	if err := finishRunning("build-release", cmd); err != nil {
 		return fmt.Errorf("error building: %v", err)

@@ -33,5 +33,7 @@ install:
 script:  
   #- make fmt lint vet cover
   - docker login -u $DOCKER_USER -p $DOCKER_PASS quay.io
-  - make backends backends-images backends-push
+  - make backends backends-images
   - make test-e2e
+  # To push the ci image to quay.io use this:
+  #- make backends-push
