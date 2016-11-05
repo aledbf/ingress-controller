@@ -11,6 +11,5 @@ echo "running ginkgo"
 
 export PATH="${BASEDIR}/..":"${PATH}"
 ginkgo -r \
-    --flakeAttempts=2 \
     -keepGoing \
     "${@:-}"
