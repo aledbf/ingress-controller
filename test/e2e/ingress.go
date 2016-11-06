@@ -96,7 +96,7 @@ spec:
     spec:
       terminationGracePeriodSeconds: 60
       containers:
-      - image: {{ image }}
+      - image: {{ .image }}
         name: nginx-ingress-lb
         imagePullPolicy: Always
         readinessProbe:
@@ -153,45 +153,37 @@ var _ = framework.KubeDescribe("Ingress controllers: [Feature:Ingress]", func() 
 	framework.KubeDescribe("NGINX [Slow]", func() {
 		var nginxController *NginxIngressController
 
-		BeforeSuite(func() {
-			By("running Ingress image")
-			// creating deployent
-			tmpfile, err := ioutil.TempFile("", "nginx.yaml")
-			if err != nil {
-				panic(err)
-			}
-			defer tmpfile.Close()
+		By("running Ingress image")
+		// creating deployent
+		tmpfile, err := ioutil.TempFile("", "nginx.yaml")
+		if err != nil {
+			panic(err)
+		}
+		defer tmpfile.Close()
 
-			rel := os.Getenv("RELEASE")
-			tmpl, err := template.New("deployment").Parse(dsTemplate)
-			if err != nil {
-				panic(err)
-			}
-			conf := make(map[string]interface{})
-			conf["image"] = fmt.Sprintf("quay.io/aledbf/nginx-ingress-controller:%v", rel)
-			buf := bytes.NewBuffer(make([]byte, 0, 1024))
-			err = tmpl.Execute(buf, conf)
-			if err != nil {
-				panic(err)
-			}
-			err = ioutil.WriteFile(tmpfile.Name(), buf.Bytes(), 0644)
-			if err != nil {
-				panic(err)
-			}
-			framework.RunKubectlOrDie("create", "-f", tmpfile.Name())
-			framework.RunKubectlOrDie("expose", "deployment", "nginx-ingress-lb", "--name=nginx-ingress-lb", "--port=80", "--target-port=80")
-			framework.RunKubectlOrDie("expose", "deployment", "nginx-ingress-lb", "--name=nginx-ingress-lb", "--port=443", "--target-port=443")
-			framework.RunKubectlOrDie("expose", "deployment", "nginx-ingress-lb", "--name=nginx-ingress-lb", "--port=18080", "--target-port=18080")
-			framework.RunKubectlOrDie("expose", "deployment", "nginx-ingress-lb", "--name=nginx-ingress-lb", "--port=10254", "--target-port=10254")
+		rel := os.Getenv("RELEASE")
+		tmpl, err := template.New("deployment").Parse(dsTemplate)
+		if err != nil {
+			panic(err)
+		}
+		conf := make(map[string]interface{})
+		conf["image"] = fmt.Sprintf("quay.io/aledbf/nginx-ingress-controller:%v", rel)
+		buf := bytes.NewBuffer()
+		err = tmpl.Execute(buf, conf)
+		if err != nil {
+			panic(err)
+		}
+		err = ioutil.WriteFile(tmpfile.Name(), buf.Bytes(), 0644)
+		if err != nil {
+			panic(err)
+		}
+		framework.RunKubectlOrDie("create", "-f", tmpfile.Name())
+		framework.RunKubectlOrDie("expose", "deployment", "nginx-ingress-lb", "--name=nginx-ingress-lb", "--port=80", "--target-port=80")
+		framework.RunKubectlOrDie("expose", "deployment", "nginx-ingress-lb", "--name=nginx-ingress-lb", "--port=443", "--target-port=443")
+		framework.RunKubectlOrDie("expose", "deployment", "nginx-ingress-lb", "--name=nginx-ingress-lb", "--port=18080", "--target-port=18080")
+		framework.RunKubectlOrDie("expose", "deployment", "nginx-ingress-lb", "--name=nginx-ingress-lb", "--port=10254", "--target-port=10254")
 
-			framework.WaitForService(f.ClientSet, "default", "nginx-ingress-lb", true, framework.Poll, framework.ServiceStartTimeout)
-		})
-
-		AfterSuite(func() {
-			By("turning down bootstrap")
-			framework.RunKubectlOrDie("delete", "deployments", "nginx-ingress-lb")
-			framework.RunKubectlOrDie("delete", "service", "nginx-ingress-lb")
-		})
+		framework.WaitForService(f.ClientSet, "default", "nginx-ingress-lb", true, framework.Poll, framework.ServiceStartTimeout)
 
 		BeforeEach(func() {
 			By("Initializing nginx controller")
@@ -221,5 +213,9 @@ var _ = framework.KubeDescribe("Ingress controllers: [Feature:Ingress]", func() 
 				jig.waitForIngress()
 			}
 		})
+
+		By("turning down bootstrap")
+		framework.RunKubectlOrDie("delete", "deployments", "nginx-ingress-lb")
+		framework.RunKubectlOrDie("delete", "service", "nginx-ingress-lb")
 	})
 })
