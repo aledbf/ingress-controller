@@ -14,21 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cache
+package generated
 
-import "k8s.io/client-go/tools/cache"
-
-// StoreToIngressLister makes a Store that lists Ingress.
-type StoreToIngressLister struct {
-	cache.Store
-}
-
-// StoreToSecretsLister makes a Store that lists Secrets.
-type StoreToSecretsLister struct {
-	cache.Store
-}
-
-// StoreToConfigmapLister makes a Store that lists Configmap.
-type StoreToConfigmapLister struct {
-	cache.Store
-}
+// No code is needed here.  This is a stub for compilation purposes.

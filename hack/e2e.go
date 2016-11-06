@@ -263,7 +263,7 @@ func DumpClusterLogs(location string) error {
 
 func Test() error {
 	if *testArgs == "" {
-		*testArgs = "--focus=\\[Feature:Ingress\\]"
+		*testArgs = "-ginkgo.focus=\\[Feature:Ingress\\]"
 	}
 	return finishRunning("Ginkgo tests", exec.Command("./hack/e2e-internal/ginkgo-e2e.sh", strings.Fields(*testArgs)...))
 }

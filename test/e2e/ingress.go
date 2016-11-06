@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"text/template"
 
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -152,8 +153,8 @@ var _ = framework.KubeDescribe("Ingress controllers: [Feature:Ingress]", func() 
 	framework.KubeDescribe("NGINX [Slow]", func() {
 		var nginxController *NginxIngressController
 
-		Before(func() {
-			By("running the image " + nginxImage)
+		BeforeSuite(func() {
+			By("running Ingress image")
 			// creating deployent
 			tmpfile, err := ioutil.TempFile("", "nginx.yaml")
 			if err != nil {
@@ -162,18 +163,18 @@ var _ = framework.KubeDescribe("Ingress controllers: [Feature:Ingress]", func() 
 			defer tmpfile.Close()
 
 			rel := os.Getenv("RELEASE")
-			tmpl, err := text_template.New("deployment").Parse(dsTemplate)
+			tmpl, err := template.New("deployment").Parse(dsTemplate)
 			if err != nil {
 				panic(err)
 			}
 			conf := make(map[string]interface{})
 			conf["image"] = fmt.Sprintf("quay.io/aledbf/nginx-ingress-controller:%v", rel)
 			buf := bytes.NewBuffer(make([]byte, 0, 1024))
-			err := t.tmpl.Execute(buf, conf)
+			err = tmpl.Execute(buf, conf)
 			if err != nil {
 				panic(err)
 			}
-			err = ioutil.WriteFile(tmpfile.Name(), data, 0644)
+			err = ioutil.WriteFile(tmpfile.Name(), buf.Bytes(), 0644)
 			if err != nil {
 				panic(err)
 			}
@@ -183,11 +184,10 @@ var _ = framework.KubeDescribe("Ingress controllers: [Feature:Ingress]", func() 
 			framework.RunKubectlOrDie("expose", "deployment", "nginx-ingress-lb", "--name=nginx-ingress-lb", "--port=18080", "--target-port=18080")
 			framework.RunKubectlOrDie("expose", "deployment", "nginx-ingress-lb", "--name=nginx-ingress-lb", "--port=10254", "--target-port=10254")
 
-			framework.WaitForService(c, "default", "nginx-ingress-lb", true, framework.Poll, framework.ServiceStartTimeout)
-			validateService("nginx-ingress-lb", 10254, framework.ServiceStartTimeout)
+			framework.WaitForService(f.ClientSet, "default", "nginx-ingress-lb", true, framework.Poll, framework.ServiceStartTimeout)
 		})
 
-		After(func() {
+		AfterSuite(func() {
 			By("turning down bootstrap")
 			framework.RunKubectlOrDie("delete", "deployments", "nginx-ingress-lb")
 			framework.RunKubectlOrDie("delete", "service", "nginx-ingress-lb")

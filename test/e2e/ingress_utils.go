@@ -496,3 +496,31 @@ func (cont *NginxIngressController) init() {
 	ExpectNoError(err)
 	framework.Logf("ingress controller running in pod %v on ip %v", cont.pod.Name, cont.externalIP)
 }
+
+func ExpectNoError(err error) {
+	Expect(err).NotTo(HaveOccurred())
+}
+
+// simpleGET executes a get on the given url, returns error if non-200 returned.
+func simpleGET(c *http.Client, url, host string) (string, error) {
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return "", err
+	}
+	req.Host = host
+	res, err := c.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer res.Body.Close()
+	rawBody, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		return "", err
+	}
+	body := string(rawBody)
+	if res.StatusCode != http.StatusOK {
+		err = fmt.Errorf(
+			"GET returned http error %v", res.StatusCode)
+	}
+	return body, err
+}

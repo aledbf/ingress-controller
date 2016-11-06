@@ -51,5 +51,3 @@ until curl -o /dev/null -sIf http://0.0.0.0:8080; do \
 done;
 
 echo "Kubernetes started"
-echo "Kubernetes information:"
-${KUBECTL} version

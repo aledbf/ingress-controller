@@ -43,10 +43,16 @@ const (
 	// images within this time we simply log their output and carry on
 	// with the tests.
 	imagePrePullingTimeout = 5 * time.Minute
-)
 
-var (
-	cloudConfig = &framework.TestContext.CloudConfig
+	// timeout on a single http request.
+	reqTimeout = 10 * time.Second
+
+	// On average it takes ~6 minutes for a single backend to come online in GCE.
+	lbPollTimeout = 15 * time.Minute
+
+	// Time required by the loadbalancer to cleanup, proportional to numApps/Ing.
+	lbCleanupTimeout = 5 * time.Minute
+	lbPollInterval   = 30 * time.Second
 )
 
 // There are certain operations we only want to run once per overall test invocation
@@ -117,6 +123,7 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	// Run on all Ginkgo nodes
 })
 
+// CleanupActionHandle ...
 type CleanupActionHandle *int
 
 var cleanupActionsLock sync.Mutex
@@ -201,5 +208,5 @@ func RunE2ETests(t *testing.T) {
 	}
 	glog.Infof("Starting e2e run %q on Ginkgo node %d", framework.RunId, config.GinkgoConfig.ParallelNode)
 
-	ginkgo.RunSpecsWithDefaultAndCustomReporters(t, "Kubernetes e2e suite", r)
+	ginkgo.RunSpecsWithDefaultAndCustomReporters(t, "Ingress controllers e2e suite", r)
 }
