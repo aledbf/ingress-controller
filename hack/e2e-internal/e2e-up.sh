@@ -15,16 +15,16 @@ docker run -d \
 
 echo "Starting kubernetes..."
 
-docker run -d --name=apiserver \
-    --net=host \
-    --pid=host \
-    --privileged=true \
-    gcr.io/google_containers/hyperkube:v${K8S_VERSION} \
-    /hyperkube apiserver \
-    --insecure-bind-address=0.0.0.0 \
-    --service-cluster-ip-range=10.0.0.1/24 \
-    --etcd_servers=http://127.0.0.1:4001 \
-    --v=2
+#docker run -d --name=apiserver \
+#    --net=host \
+#    --pid=host \
+#    --privileged=true \
+#    gcr.io/google_containers/hyperkube:v${K8S_VERSION} \
+#    /hyperkube apiserver \
+#    --insecure-bind-address=0.0.0.0 \
+#    --service-cluster-ip-range=10.0.0.1/24 \
+#    --etcd_servers=http://127.0.0.1:4001 \
+#    --v=2
 
 docker run -d --name=kubelet \
     --volume=/:/rootfs:ro \
@@ -51,3 +51,5 @@ until curl -o /dev/null -sIf http://0.0.0.0:8080; do \
 done;
 
 echo "Kubernetes started"
+
+${KUBECTL} create -f test/images/clusterapi-tester.yaml
