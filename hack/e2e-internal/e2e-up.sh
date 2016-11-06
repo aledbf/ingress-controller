@@ -33,7 +33,10 @@ docker run -d \
     --api-servers=http://localhost:8080 \
     --config=/etc/kubernetes/manifests \
     --allow-privileged --v=2
-  
+
+# enable ingress in api server
+docker cp hack/e2e-internal/master.json hyperkube-installer:/etc/kubernetes/manifests/master.json 
+
 echo "waiting until api server is available..."
 until curl -o /dev/null -sIf http://0.0.0.0:8080; do \
   sleep 10;

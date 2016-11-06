@@ -58,4 +58,3 @@ spec:
   restartPolicy: Never
   # This pod needs hostNetworking for true VM perf measurement as well as avoiding cbr0 issues
   hostNetwork: true
-

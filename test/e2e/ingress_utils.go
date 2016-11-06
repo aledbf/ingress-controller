@@ -25,6 +25,7 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"fmt"
+	"html/template"
 	"io"
 	"io/ioutil"
 	"math/big"
@@ -36,7 +37,6 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
@@ -466,27 +466,47 @@ func newTestJig(c clientset.Interface) *testJig {
 // NginxIngressController manages implementation details of Ingress on Nginx.
 type NginxIngressController struct {
 	ns         string
-	rc         *api.ReplicationController
+	dp         *extensions.Deployment
 	pod        *api.Pod
 	c          clientset.Interface
 	externalIP string
 }
 
 func (cont *NginxIngressController) init() {
-	mkpath := func(file string) string {
-		return filepath.Join(framework.TestContext.RepoRoot, ingressManifestPath, "nginx", file)
-	}
 	framework.Logf("initializing nginx ingress controller")
-	framework.RunKubectlOrDie("create", "-f", mkpath("rc.yaml"), fmt.Sprintf("--namespace=%v", cont.ns))
 
-	rc, err := cont.c.Core().ReplicationControllers(cont.ns).Get("nginx-ingress-controller")
+	tmpfile, err := ioutil.TempFile("", "nginx.yaml")
+	if err != nil {
+		panic(err)
+	}
+	defer tmpfile.Close()
+
+	rel := os.Getenv("RELEASE")
+	tmpl, err := template.New("deployment").Parse(dsTemplate)
+	if err != nil {
+		panic(err)
+	}
+	conf := make(map[string]interface{})
+	conf["image"] = fmt.Sprintf("quay.io/aledbf/nginx-ingress-controller:%v", rel)
+	var buf bytes.Buffer
+	err = tmpl.Execute(&buf, conf)
+	if err != nil {
+		panic(err)
+	}
+	err = ioutil.WriteFile(tmpfile.Name(), buf.Bytes(), 0644)
+
+	framework.RunKubectlOrDie("create", "-f", tmpfile.Name(), fmt.Sprintf("--namespace=%v", cont.ns))
+
+	dp, err := cont.c.Extensions().Deployments(cont.ns).Get("nginx-ingress-controller")
 	ExpectNoError(err)
-	cont.rc = rc
+	cont.dp = dp
 
-	framework.Logf("waiting for pods with label %v", rc.Spec.Selector)
-	sel := labels.SelectorFromSet(labels.Set(rc.Spec.Selector))
+	framework.Logf("waiting for pods with label %v", dp.Spec.Selector)
+	sel := labels.SelectorFromSet(labels.Set(dp.Spec.Selector.MatchLabels))
 	ExpectNoError(testutils.WaitForPodsWithLabelRunning(cont.c, cont.ns, sel))
-	pods, err := cont.c.Core().Pods(cont.ns).List(api.ListOptions{LabelSelector: sel})
+	pods, err := cont.c.Core().Pods(cont.ns).List(api.ListOptions{
+		LabelSelector: sel,
+	})
 	ExpectNoError(err)
 	if len(pods.Items) == 0 {
 		framework.Failf("Failed to find nginx ingress controller pods with selector %v", sel)
@@ -497,6 +517,7 @@ func (cont *NginxIngressController) init() {
 	framework.Logf("ingress controller running in pod %v on ip %v", cont.pod.Name, cont.externalIP)
 }
 
+// ExpectNoError ...
 func ExpectNoError(err error) {
 	Expect(err).NotTo(HaveOccurred())
 }

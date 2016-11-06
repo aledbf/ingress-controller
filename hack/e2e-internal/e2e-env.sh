@@ -2,7 +2,6 @@
 
 [[ $DEBUG ]] && set -x
 
-export ETCD_VERSION=3.0.14
 export K8S_VERSION=1.4.5
 
 export PWD=`pwd`
