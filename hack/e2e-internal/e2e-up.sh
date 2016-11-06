@@ -7,9 +7,9 @@ set -eof pipefail
 # include env
 . hack/e2e-internal/e2e-env.sh
 
-mkdir -p /var/lib/kubelet
-mount --bind /var/lib/kubelet /var/lib/kubelet
-mount --make-shared /var/lib/kubelet
+sudo mkdir -p /var/lib/kubelet
+sudo mount --bind /var/lib/kubelet /var/lib/kubelet
+sudo mount --make-shared /var/lib/kubelet
 
 # do not failt if the container is not running
 docker rm -f hyperkube-installer || true

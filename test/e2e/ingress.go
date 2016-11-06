@@ -94,11 +94,9 @@ spec:
       labels:
         name: nginx-ingress-lb
     spec:
-      terminationGracePeriodSeconds: 60
       containers:
       - image: {{ .image }}
         name: nginx-ingress-lb
-        imagePullPolicy: Always
         readinessProbe:
           httpGet:
             path: /healthz
