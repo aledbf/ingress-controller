@@ -1,0 +1,61 @@
+# e2e-image-puller seeds nodes in an e2e cluster with test images.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: e2e-image-puller
+  namespace: kube-system
+  labels:
+    name: e2e-image-puller
+spec:
+  containers:
+  - name: image-puller
+    resources:
+      requests:
+        cpu: 100m
+      limits:
+        cpu: 100m
+    image: gcr.io/google_containers/busybox:1.24
+    # TODO: Replace this with a go script that pulls in parallel?
+    # Currently it takes ~5m to pull all e2e images, so this is OK, and
+    # fewer moving parts is always better.
+    # TODO: Replace the hardcoded image list with an autogen list; the list is
+    # currently hard-coded for static verification. It was generated via:
+    # grep -Iiroh "gcr.io/google_.*" "${KUBE_ROOT}/test/e2e" | \
+    #     sed -e "s/[,\")}]//g" | awk '{print $1}' | sort | uniq | tr '\n' ' '
+    # We always want the subshell to exit 0 so this pod doesn't end up
+    # blocking tests in an Error state.
+    command:
+    - /bin/sh
+    - -c
+    - "for i in gcr.io/google_containers/busybox; do echo $(date '+%X') pulling $i; docker pull $i 1>/dev/null; done; exit 0;"
+    securityContext:
+      privileged: true
+    volumeMounts:
+    - mountPath: /var/run/docker.sock
+      name: socket
+    - mountPath: /usr/bin/docker
+      name: docker
+  # Add a container that runs a health-check
+  - name: nethealth-check
+    resources:
+      requests:
+        cpu: 100m
+      limits:
+        cpu: 100m
+    image:  gcr.io/google_containers/kube-nethealth-amd64:1.0
+    command:
+    - /bin/sh
+    - -c
+    - "/usr/bin/nethealth || true"
+  volumes:
+  - hostPath:
+      path: /var/run/docker.sock
+    name: socket
+  - hostPath:
+      path: /usr/bin/docker
+    name: docker
+  # This pod is really fire-and-forget.
+  restartPolicy: Never
+  # This pod needs hostNetworking for true VM perf measurement as well as avoiding cbr0 issues
+  hostNetwork: true
+
