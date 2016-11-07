@@ -9,7 +9,6 @@ set -eof pipefail
 
 echo "running ginkgo"
 
-export PATH="${BASEDIR}/..":"${PATH}"
 cd test/e2e
 ginkgo -r \
     -keepGoing -- \
