@@ -30,6 +30,10 @@ install:
   - go get github.com/modocache/gover
   - if ! go get github.com/golang/tools/cmd/cover; then go get golang.org/x/tools/cmd/cover; fi
 
+before_script:
+  - export PATH=$PATH:$PWD/hack/e2e-internal/
+  - env
+
 script:  
   #- make fmt lint vet cover
   - docker login -u $DOCKER_USER -p $DOCKER_PASS quay.io
