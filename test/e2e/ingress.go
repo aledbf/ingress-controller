@@ -17,6 +17,8 @@ limitations under the License.
 package e2e
 
 import (
+	"fmt"
+
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -30,6 +32,7 @@ apiVersion: extensions/v1beta1
 kind: DaemonSet
 metadata:
   name: nginx-ingress-controller
+	namespace: {{ .namespace }}
 spec:
   template:
     metadata:
@@ -111,7 +114,7 @@ var _ = framework.KubeDescribe("Ingress controllers: [Feature:Ingress]", func() 
 			By("Deleting ingress")
 			jig.deleteIngress()
 			By("Deleting ingress controller")
-			framework.RunKubectlOrDie("delete", "deployments", "nginx-ingress-controller", "--namespace", ns)
+			framework.RunKubectlOrDie("delete", "deployments", "nginx-ingress-controller", fmt.Sprintf("--namespace=%v", ns))
 		})
 
 		It("should conform to Ingress spec", func() {

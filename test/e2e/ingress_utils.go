@@ -488,6 +488,7 @@ func (cont *NginxIngressController) init() {
 	}
 	conf := make(map[string]interface{})
 	conf["image"] = fmt.Sprintf("quay.io/aledbf/nginx-ingress-controller:%v", rel)
+	conf["namespace"] = cont.ns
 	var buf bytes.Buffer
 	err = tmpl.Execute(&buf, conf)
 	if err != nil {
