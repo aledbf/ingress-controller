@@ -48,3 +48,4 @@ sleep 120
 
 ${KUBECTL} create -f test/images/clusterapi-tester.yaml
 ${KUBECTL} create -f test/images/e2e-image-puller.yaml
+${KUBECTL} create -f test/images/default-backend.yaml
