@@ -32,7 +32,7 @@ apiVersion: extensions/v1beta1
 kind: DaemonSet
 metadata:
   name: nginx-ingress-controller
-	namespace: {{ .namespace }}
+  namespace: {{ .namespace }}
 spec:
   template:
     metadata:
