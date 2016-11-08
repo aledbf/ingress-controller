@@ -27,7 +27,7 @@ spec:
     command:
     - /bin/sh
     - -c
-    - "for i in gcr.io/google_containers/busybox; do echo $(date '+%X') pulling $i; docker pull $i 1>/dev/null; done; exit 0;"
+    - "for i in gcr.io/google_containers/busybox; do echo $(date '+%X') pulling $i; /usr/bin/docker pull $i 1>/dev/null; done; exit 0;"
     securityContext:
       privileged: true
     volumeMounts:
