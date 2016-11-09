@@ -22,11 +22,11 @@ import (
 	"strings"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/client/unversioned"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 )
 
 // IsValidService checks if exists a service with the specified name
-func IsValidService(kubeClient unversioned.Interface, name string) (*api.Service, error) {
+func IsValidService(kubeClient *clientset.Clientset, name string) (*api.Service, error) {
 	ns, name, err := ParseNameNS(name)
 	if err != nil {
 		return nil, err
@@ -35,7 +35,7 @@ func IsValidService(kubeClient unversioned.Interface, name string) (*api.Service
 }
 
 // IsValidSecret checks if exists a secret with the specified name
-func IsValidSecret(kubeClient unversioned.Interface, name string) (*api.Secret, error) {
+func IsValidSecret(kubeClient *clientset.Clientset, name string) (*api.Secret, error) {
 	ns, name, err := ParseNameNS(name)
 	if err != nil {
 		return nil, err
@@ -54,7 +54,7 @@ func ParseNameNS(input string) (string, string, error) {
 }
 
 // GetNodeIP returns the IP address of a node in the cluster
-func GetNodeIP(kubeClient *unversioned.Client, name string) string {
+func GetNodeIP(kubeClient *clientset.Clientset, name string) string {
 	var externalIP string
 	node, err := kubeClient.Nodes().Get(name)
 	if err != nil {
@@ -88,7 +88,7 @@ type PodInfo struct {
 
 // GetPodDetails returns runtime information about the pod:
 // name, namespace and IP of the node where it is running
-func GetPodDetails(kubeClient *unversioned.Client) (*PodInfo, error) {
+func GetPodDetails(kubeClient *clientset.Clientset) (*PodInfo, error) {
 	podName := os.Getenv("POD_NAME")
 	podNs := os.Getenv("POD_NAMESPACE")
 

@@ -32,7 +32,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/leaderelection"
-	"k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/wait"
 )
@@ -49,8 +48,7 @@ type Sync interface {
 
 // Config ...
 type Config struct {
-	Client         *unversioned.Client
-	ElectionClient *clientset.Clientset
+	Client         *clientset.Clientset
 	PublishService string
 	IngressLister  cache_store.StoreToIngressLister
 }
@@ -174,7 +172,7 @@ func NewStatusSyncer(config Config) Sync {
 
 	le, err := NewElection("ingress-controller-leader",
 		pod.Name, pod.Namespace, 30*time.Second,
-		st.callback, config.Client, config.ElectionClient)
+		st.callback, config.Client)
 	if err != nil {
 		glog.Fatalf("unexpected error starting leader election: %v", err)
 	}
@@ -233,7 +231,7 @@ func (s *statusSync) updateStatus(newIPs []api.LoadBalancerIngress) {
 		ing := cur.(*extensions.Ingress)
 		go func(wg *sync.WaitGroup) {
 			defer wg.Done()
-			ingClient := s.Client.Extensions().Ingress(ing.Namespace)
+			ingClient := s.Client.Extensions().Ingresses(ing.Namespace)
 			currIng, err := ingClient.Get(ing.Name)
 			if err != nil {
 				glog.Errorf("unexpected error searching Ingress %v/%v: %v", ing.Namespace, ing.Name, err)
