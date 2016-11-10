@@ -497,6 +497,7 @@ func (cont *NginxIngressController) init() {
 	err = ioutil.WriteFile(tmpfile.Name(), buf.Bytes(), 0644)
 
 	framework.RunKubectlOrDie("create", "-f", tmpfile.Name(), fmt.Sprintf("--namespace=%v", cont.ns))
+	framework.RunKubectlOrDie("scale", "deployment/nginx-ingress-controller", fmt.Sprintf("--namespace=%v", cont.ns), "--scale=1")
 
 	dp, err := cont.c.Extensions().Deployments(cont.ns).Get("nginx-ingress-controller")
 	ExpectNoError(err)
