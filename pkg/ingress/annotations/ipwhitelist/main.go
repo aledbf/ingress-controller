@@ -18,6 +18,7 @@ package ipwhitelist
 
 import (
 	"errors"
+	"sort"
 	"strings"
 
 	"github.com/aledbf/ingress-controller/pkg/ingress/annotations/parser"
@@ -68,5 +69,6 @@ func ParseAnnotations(cfg defaults.Backend, ing *extensions.Ingress) (*SourceRan
 		cidrs = append(cidrs, k)
 	}
 
+	sort.Strings(cidrs)
 	return &SourceRange{cidrs}, nil
 }
