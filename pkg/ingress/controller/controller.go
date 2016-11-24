@@ -32,13 +32,12 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	unversionedcore "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	"k8s.io/kubernetes/pkg/client/record"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/healthz"
-	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/util/intstr"
-	"k8s.io/kubernetes/pkg/watch"
 
 	cache_store "github.com/aledbf/ingress-controller/pkg/cache"
 	"github.com/aledbf/ingress-controller/pkg/ingress"
@@ -129,8 +128,7 @@ type GenericController struct {
 
 // Configuration contains all the settings required by an Ingress controller
 type Configuration struct {
-	Client         *client.Client
-	ElectionClient *clientset.Clientset
+	Client *clientset.Clientset
 
 	ResyncPeriod   time.Duration
 	DefaultService string
@@ -154,7 +152,9 @@ func newIngressController(config *Configuration) Interface {
 
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
-	eventBroadcaster.StartRecordingToSink(config.Client.Events(config.Namespace))
+	eventBroadcaster.StartRecordingToSink(unversionedcore.EventSinkImpl{
+		Interface: config.Client.Core().Events(config.Namespace),
+	})
 
 	ic := GenericController{
 		cfg:             config,
@@ -252,66 +252,30 @@ func newIngressController(config *Configuration) Interface {
 	}
 
 	ic.ingLister.Store, ic.ingController = cache.NewInformer(
-		&cache.ListWatch{
-			ListFunc: func(opts api.ListOptions) (runtime.Object, error) {
-				return ic.cfg.Client.Extensions().Ingress(ic.cfg.Namespace).List(opts)
-			},
-			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return ic.cfg.Client.Extensions().Ingress(ic.cfg.Namespace).Watch(options)
-			},
-		},
+		cache.NewListWatchFromClient(ic.cfg.Client.Extensions().RESTClient(), "ingresses", ic.cfg.Namespace, fields.Everything()),
 		&extensions.Ingress{}, ic.cfg.ResyncPeriod, ingEventHandler)
 
 	ic.endpLister.Store, ic.endpController = cache.NewInformer(
-		&cache.ListWatch{
-			ListFunc: func(opts api.ListOptions) (runtime.Object, error) {
-				return ic.cfg.Client.Endpoints(ic.cfg.Namespace).List(opts)
-			},
-			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return ic.cfg.Client.Endpoints(ic.cfg.Namespace).Watch(options)
-			},
-		},
+		cache.NewListWatchFromClient(ic.cfg.Client.Core().RESTClient(), "endpoints", ic.cfg.Namespace, fields.Everything()),
 		&api.Endpoints{}, ic.cfg.ResyncPeriod, eventHandler)
 
+	ic.secrLister.Store, ic.secrController = cache.NewInformer(
+		cache.NewListWatchFromClient(ic.cfg.Client.Core().RESTClient(), "secrets", ic.cfg.Namespace, fields.Everything()),
+		&api.Secret{}, ic.cfg.ResyncPeriod, secrEventHandler)
+
+	ic.mapLister.Store, ic.mapController = cache.NewInformer(
+		cache.NewListWatchFromClient(ic.cfg.Client.Core().RESTClient(), "configmaps", ic.cfg.Namespace, fields.Everything()),
+		&api.ConfigMap{}, ic.cfg.ResyncPeriod, mapEventHandler)
+
 	ic.svcLister.Indexer, ic.svcController = cache.NewIndexerInformer(
-		&cache.ListWatch{
-			ListFunc: func(opts api.ListOptions) (runtime.Object, error) {
-				return ic.cfg.Client.Services(ic.cfg.Namespace).List(opts)
-			},
-			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return ic.cfg.Client.Services(ic.cfg.Namespace).Watch(options)
-			},
-		},
+		cache.NewListWatchFromClient(ic.cfg.Client.Core().RESTClient(), "services", ic.cfg.Namespace, fields.Everything()),
 		&api.Service{},
 		ic.cfg.ResyncPeriod,
 		cache.ResourceEventHandlerFuncs{},
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 
-	ic.secrLister.Store, ic.secrController = cache.NewInformer(
-		&cache.ListWatch{
-			ListFunc: func(opts api.ListOptions) (runtime.Object, error) {
-				return ic.cfg.Client.Secrets(ic.cfg.Namespace).List(opts)
-			},
-			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return ic.cfg.Client.Secrets(ic.cfg.Namespace).Watch(options)
-			},
-		},
-		&api.Secret{}, ic.cfg.ResyncPeriod, secrEventHandler)
-
-	ic.mapLister.Store, ic.mapController = cache.NewInformer(
-		&cache.ListWatch{
-			ListFunc: func(opts api.ListOptions) (runtime.Object, error) {
-				return ic.cfg.Client.ConfigMaps(ic.cfg.Namespace).List(opts)
-			},
-			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return ic.cfg.Client.ConfigMaps(ic.cfg.Namespace).Watch(options)
-			},
-		},
-		&api.ConfigMap{}, ic.cfg.ResyncPeriod, mapEventHandler)
-
 	ic.syncStatus = status.NewStatusSyncer(status.Config{
 		Client:         config.Client,
-		ElectionClient: ic.cfg.ElectionClient,
 		PublishService: ic.cfg.PublishService,
 		IngressLister:  ic.ingLister,
 	})

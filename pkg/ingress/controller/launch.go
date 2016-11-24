@@ -19,7 +19,6 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/restclient"
-	"k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/healthz"
 	kubectl_util "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
@@ -99,14 +98,9 @@ func NewIngressController(backend ingress.Controller) Interface {
 		}
 	}
 
-	kubeClient, err := unversioned.New(kubeconfig)
+	kubeClient, err := clientset.NewForConfig(kubeconfig)
 	if err != nil {
 		glog.Fatalf("failed to create client: %v", err)
-	}
-
-	leaderElectionClient, err := clientset.NewForConfig(restclient.AddUserAgent(kubeconfig, "leader-election"))
-	if err != nil {
-		glog.Fatalf("vinvalid API configuration: %v", err)
 	}
 
 	_, err = k8s.IsValidService(kubeClient, *defaultSvc)
@@ -140,7 +134,6 @@ func NewIngressController(backend ingress.Controller) Interface {
 
 	config := &Configuration{
 		Client:                kubeClient,
-		ElectionClient:        leaderElectionClient,
 		ResyncPeriod:          *resyncPeriod,
 		DefaultService:        *defaultSvc,
 		IngressClass:          *ingressClass,

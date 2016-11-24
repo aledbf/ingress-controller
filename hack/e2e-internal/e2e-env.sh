@@ -2,13 +2,13 @@
 
 [[ $DEBUG ]] && set -x
 
-export ETCD_VERSION=3.0.14
 export K8S_VERSION=1.4.5
 
 export PWD=`pwd`
 export BASEDIR="$(dirname ${BASH_SOURCE})"
 export KUBECTL="${BASEDIR}/kubectl"
 export GOOS="${GOOS:-linux}"
+export PATH="${PATH}:${BASEDIR}:${BASEDIR}/.."
 
 if [ ! -e ${KUBECTL} ]; then
   echo "kubectl binary is missing. downloading..."

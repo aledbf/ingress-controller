@@ -29,10 +29,9 @@ import (
 	"k8s.io/kubernetes/pkg/client/leaderelection"
 	"k8s.io/kubernetes/pkg/client/leaderelection/resourcelock"
 	"k8s.io/kubernetes/pkg/client/record"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
 )
 
-func getCurrentLeader(electionID, namespace string, c client.Interface) (string, *api.Endpoints, error) {
+func getCurrentLeader(electionID, namespace string, c *clientset.Clientset) (string, *api.Endpoints, error) {
 	endpoints, err := c.Endpoints(namespace).Get(electionID)
 	if err != nil {
 		return "", nil, err
@@ -55,8 +54,7 @@ func NewElection(electionID,
 	namespace string,
 	ttl time.Duration,
 	callback func(leader string),
-	c client.Interface,
-	leaderElectionClient *clientset.Clientset) (*leaderelection.LeaderElector, error) {
+	c *clientset.Clientset) (*leaderelection.LeaderElector, error) {
 
 	_, err := c.Endpoints(namespace).Get(electionID)
 	if err != nil {
@@ -102,7 +100,7 @@ func NewElection(electionID,
 
 	lock := resourcelock.EndpointsLock{
 		EndpointsMeta: api.ObjectMeta{Namespace: namespace, Name: electionID},
-		Client:        leaderElectionClient,
+		Client:        c,
 		LockConfig: resourcelock.ResourceLockConfig{
 			Identity:      id,
 			EventRecorder: recorder,

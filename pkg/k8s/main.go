@@ -22,25 +22,25 @@ import (
 	"strings"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/client/unversioned"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 )
 
 // IsValidService checks if exists a service with the specified name
-func IsValidService(kubeClient unversioned.Interface, name string) (*api.Service, error) {
+func IsValidService(kubeClient clientset.Interface, name string) (*api.Service, error) {
 	ns, name, err := ParseNameNS(name)
 	if err != nil {
 		return nil, err
 	}
-	return kubeClient.Services(ns).Get(name)
+	return kubeClient.Core().Services(ns).Get(name)
 }
 
 // IsValidSecret checks if exists a secret with the specified name
-func IsValidSecret(kubeClient unversioned.Interface, name string) (*api.Secret, error) {
+func IsValidSecret(kubeClient clientset.Interface, name string) (*api.Secret, error) {
 	ns, name, err := ParseNameNS(name)
 	if err != nil {
 		return nil, err
 	}
-	return kubeClient.Secrets(ns).Get(name)
+	return kubeClient.Core().Secrets(ns).Get(name)
 }
 
 // ParseNameNS parses a string searching a namespace and name
@@ -54,9 +54,9 @@ func ParseNameNS(input string) (string, string, error) {
 }
 
 // GetNodeIP returns the IP address of a node in the cluster
-func GetNodeIP(kubeClient *unversioned.Client, name string) string {
+func GetNodeIP(kubeClient clientset.Interface, name string) string {
 	var externalIP string
-	node, err := kubeClient.Nodes().Get(name)
+	node, err := kubeClient.Core().Nodes().Get(name)
 	if err != nil {
 		return externalIP
 	}
@@ -88,7 +88,7 @@ type PodInfo struct {
 
 // GetPodDetails returns runtime information about the pod:
 // name, namespace and IP of the node where it is running
-func GetPodDetails(kubeClient *unversioned.Client) (*PodInfo, error) {
+func GetPodDetails(kubeClient clientset.Interface) (*PodInfo, error) {
 	podName := os.Getenv("POD_NAME")
 	podNs := os.Getenv("POD_NAMESPACE")
 
@@ -96,7 +96,7 @@ func GetPodDetails(kubeClient *unversioned.Client) (*PodInfo, error) {
 		return nil, fmt.Errorf("unable to get POD information (missing POD_NAME or POD_NAMESPACE environment variable")
 	}
 
-	pod, _ := kubeClient.Pods(podNs).Get(podName)
+	pod, _ := kubeClient.Core().Pods(podNs).Get(podName)
 	if pod == nil {
 		return nil, fmt.Errorf("unable to get POD information")
 	}
