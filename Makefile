@@ -60,6 +60,10 @@ test: fmt lint vet
 test-e2e: ginkgo
 	@go run hack/e2e.go -v --up --test --down
 
+# Removes temporal files
+#
+# Example:
+# make clean
 .PHONY: cover
 cover:
 	@echo "+ $@"
@@ -67,23 +71,43 @@ cover:
 	gover
 	goveralls -coverprofile=gover.coverprofile -service travis-ci -repotoken ${COVERALLS_TOKEN}
 
+# Removes temporal files
+#
+# Example:
+# make clean
 .PHONY: vet
 vet:
 	@echo "+ $@"
 	@go vet ${GO_LIST_FILES}
 
+# Removes temporal files
+#
+# Example:
+# make clean
 .PHONY: clean
 clean:
 	make -C backends/nginx clean
 
+# Build the ingress backends
+#
+# Example:
+# make backends
 .PHONY: backends
 backends:
 	make -C backends/nginx build
 
+# Build the ingress backends images
+#
+# Example:
+# make backends-images
 .PHONY: backends-images
 backends-images:
 	make -C backends/nginx container
 
+# Push docker image from ci to the registry
+#
+# Example:
+# make backends-push
 .PHONY: backends-push
 backends-push:
 	make -C backends/nginx push
