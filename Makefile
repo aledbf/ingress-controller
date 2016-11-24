@@ -23,7 +23,7 @@ endif
 # base package. It contains the common and backends code
 PKG := "github.com/aledbf/ingress-controller"
 
-GO_LIST_FILES=$(shell go list ${PKG}/... | grep -v vendor)
+GO_LIST_FILES=$(shell go list ${PKG}/... | grep -v vendor | grep -v "test/e2e")
 
 # Checks if go code follow formtat rules using gofmt.
 #

@@ -28,17 +28,18 @@ import (
 
 	"github.com/golang/glog"
 
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/client/cache"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	"k8s.io/kubernetes/pkg/client/record"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/healthz"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util/flowcontrol"
-	"k8s.io/kubernetes/pkg/util/intstr"
-	"k8s.io/kubernetes/pkg/watch"
+
+	"k8s.io/client-go/kubernetes"
+	typed_core "k8s.io/client-go/kubernetes/typed/core/v1"
+	types "k8s.io/client-go/pkg/api"
+	api "k8s.io/client-go/pkg/api/v1"
+	extensions "k8s.io/client-go/pkg/apis/extensions/v1beta1"
+	"k8s.io/client-go/pkg/fields"
+	"k8s.io/client-go/pkg/util/flowcontrol"
+	"k8s.io/client-go/pkg/util/intstr"
+	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/tools/record"
 
 	cache_store "github.com/aledbf/ingress-controller/pkg/cache"
 	"github.com/aledbf/ingress-controller/pkg/ingress"
@@ -129,8 +130,8 @@ type GenericController struct {
 
 // Configuration contains all the settings required by an Ingress controller
 type Configuration struct {
-	Client         *client.Client
-	ElectionClient *clientset.Clientset
+	Client         kubernetes.Interface
+	ElectionClient *kubernetes.Clientset
 
 	ResyncPeriod   time.Duration
 	DefaultService string
@@ -154,7 +155,7 @@ func newIngressController(config *Configuration) Interface {
 
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
-	eventBroadcaster.StartRecordingToSink(config.Client.Events(config.Namespace))
+	eventBroadcaster.StartRecordingToSink(typed_core.EventSinkImpl{Interface: config.Client.Core().Events(config.Namespace)})
 
 	ic := GenericController{
 		cfg:             config,
@@ -252,62 +253,27 @@ func newIngressController(config *Configuration) Interface {
 	}
 
 	ic.ingLister.Store, ic.ingController = cache.NewInformer(
-		&cache.ListWatch{
-			ListFunc: func(opts api.ListOptions) (runtime.Object, error) {
-				return ic.cfg.Client.Extensions().Ingress(ic.cfg.Namespace).List(opts)
-			},
-			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return ic.cfg.Client.Extensions().Ingress(ic.cfg.Namespace).Watch(options)
-			},
-		},
+		cache.NewListWatchFromClient(ic.cfg.Client.Extensions().RESTClient(), "ingresses", ic.cfg.Namespace, fields.Everything()),
 		&extensions.Ingress{}, ic.cfg.ResyncPeriod, ingEventHandler)
 
 	ic.endpLister.Store, ic.endpController = cache.NewInformer(
-		&cache.ListWatch{
-			ListFunc: func(opts api.ListOptions) (runtime.Object, error) {
-				return ic.cfg.Client.Endpoints(ic.cfg.Namespace).List(opts)
-			},
-			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return ic.cfg.Client.Endpoints(ic.cfg.Namespace).Watch(options)
-			},
-		},
+		cache.NewListWatchFromClient(ic.cfg.Client.Core().RESTClient(), "endpoints", ic.cfg.Namespace, fields.Everything()),
 		&api.Endpoints{}, ic.cfg.ResyncPeriod, eventHandler)
 
+	ic.secrLister.Store, ic.secrController = cache.NewInformer(
+		cache.NewListWatchFromClient(ic.cfg.Client.Core().RESTClient(), "secrets", ic.cfg.Namespace, fields.Everything()),
+		&api.Secret{}, ic.cfg.ResyncPeriod, secrEventHandler)
+
+	ic.mapLister.Store, ic.mapController = cache.NewInformer(
+		cache.NewListWatchFromClient(ic.cfg.Client.Core().RESTClient(), "configmaps", ic.cfg.Namespace, fields.Everything()),
+		&api.ConfigMap{}, ic.cfg.ResyncPeriod, mapEventHandler)
+
 	ic.svcLister.Indexer, ic.svcController = cache.NewIndexerInformer(
-		&cache.ListWatch{
-			ListFunc: func(opts api.ListOptions) (runtime.Object, error) {
-				return ic.cfg.Client.Services(ic.cfg.Namespace).List(opts)
-			},
-			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return ic.cfg.Client.Services(ic.cfg.Namespace).Watch(options)
-			},
-		},
+		cache.NewListWatchFromClient(ic.cfg.Client.Core().RESTClient(), "services", ic.cfg.Namespace, fields.Everything()),
 		&api.Service{},
 		ic.cfg.ResyncPeriod,
 		cache.ResourceEventHandlerFuncs{},
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
-
-	ic.secrLister.Store, ic.secrController = cache.NewInformer(
-		&cache.ListWatch{
-			ListFunc: func(opts api.ListOptions) (runtime.Object, error) {
-				return ic.cfg.Client.Secrets(ic.cfg.Namespace).List(opts)
-			},
-			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return ic.cfg.Client.Secrets(ic.cfg.Namespace).Watch(options)
-			},
-		},
-		&api.Secret{}, ic.cfg.ResyncPeriod, secrEventHandler)
-
-	ic.mapLister.Store, ic.mapController = cache.NewInformer(
-		&cache.ListWatch{
-			ListFunc: func(opts api.ListOptions) (runtime.Object, error) {
-				return ic.cfg.Client.ConfigMaps(ic.cfg.Namespace).List(opts)
-			},
-			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return ic.cfg.Client.ConfigMaps(ic.cfg.Namespace).Watch(options)
-			},
-		},
-		&api.ConfigMap{}, ic.cfg.ResyncPeriod, mapEventHandler)
 
 	ic.syncStatus = status.NewStatusSyncer(status.Config{
 		Client:         config.Client,
@@ -369,7 +335,7 @@ func (ic *GenericController) getSecret(name string) (*api.Secret, error) {
 
 func (ic *GenericController) getConfigMap(ns, name string) (*api.ConfigMap, error) {
 	// TODO: check why ic.mapLister.Store.GetByKey(mapKey) is not stable (random content)
-	return ic.cfg.Client.ConfigMaps(ns).Get(name)
+	return ic.cfg.Client.Core().ConfigMaps(ns).Get(name)
 }
 
 // sync collects all the pieces required to assemble the configuration file and
@@ -1011,7 +977,9 @@ func (ic *GenericController) getEndpoints(
 	proto api.Protocol,
 	hz *healthcheck.Upstream) []ingress.UpstreamServer {
 	glog.V(3).Infof("getting endpoints for service %v/%v and port %v", s.Namespace, s.Name, servicePort.String())
-	ep, err := ic.endpLister.GetServiceEndpoints(s)
+	out := &types.Service{}
+	api.Convert_v1_Service_To_api_Service(s, out, nil)
+	ep, err := ic.endpLister.GetServiceEndpoints(out)
 	if err != nil {
 		glog.Warningf("unexpected error obtaining service endpoints: %v", err)
 		return []ingress.UpstreamServer{}

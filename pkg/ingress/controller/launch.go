@@ -16,12 +16,13 @@ import (
 	"github.com/aledbf/ingress-controller/pkg/k8s"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"k8s.io/kubernetes/pkg/api"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	"k8s.io/kubernetes/pkg/client/restclient"
-	"k8s.io/kubernetes/pkg/client/unversioned"
+
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/pkg/api"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
+
 	"k8s.io/kubernetes/pkg/healthz"
-	kubectl_util "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
 
 // NewIngressController returns a configured Ingress controller ready to start
@@ -77,7 +78,6 @@ func NewIngressController(backend ingress.Controller) Interface {
 
 	flags.AddGoFlagSet(flag.CommandLine)
 	flags.Parse(os.Args)
-	clientConfig := kubectl_util.DefaultClientConfig(flags)
 
 	flag.Set("logtostderr", "true")
 
@@ -91,20 +91,22 @@ func NewIngressController(backend ingress.Controller) Interface {
 		glog.Fatalf("Please specify --default-backend-service")
 	}
 
-	kubeconfig, err := restclient.InClusterConfig()
+	// running inside the cluster?
+	kubeconfig, err := rest.InClusterConfig()
 	if err != nil {
-		kubeconfig, err = clientConfig.ClientConfig()
+		kc, err := clientcmd.DefaultClientConfig.ClientConfig()
 		if err != nil {
 			glog.Fatalf("error configuring the client: %v", err)
 		}
+		kubeconfig = kc
 	}
 
-	kubeClient, err := unversioned.New(kubeconfig)
+	kubeClient, err := kubernetes.NewForConfig(kubeconfig)
 	if err != nil {
-		glog.Fatalf("failed to create client: %v", err)
+		glog.Fatalf("error configuring the client: %v", err)
 	}
 
-	leaderElectionClient, err := clientset.NewForConfig(restclient.AddUserAgent(kubeconfig, "leader-election"))
+	leaderElectionClient, err := kubernetes.NewForConfig(rest.AddUserAgent(kubeconfig, "leader-election"))
 	if err != nil {
 		glog.Fatalf("vinvalid API configuration: %v", err)
 	}

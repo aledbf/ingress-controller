@@ -19,7 +19,7 @@ package cors
 import (
 	"github.com/aledbf/ingress-controller/pkg/ingress/annotations/parser"
 
-	"k8s.io/kubernetes/pkg/apis/extensions"
+	extensions "k8s.io/client-go/pkg/apis/extensions/v1beta1"
 )
 
 const (
