@@ -1,3 +1,8 @@
+# DEPRECATED
+
+## This repository was migrated to https://github.com/kubernetes/ingress
+
+
 
 [![Build Status](https://travis-ci.org/aledbf/ingress-controller.svg?branch=master)](https://travis-ci.org/aledbf/ingress-controller)
 [![Coverage Status](https://coveralls.io/repos/github/aledbf/ingress-controller/badge.svg?branch=master)](https://coveralls.io/github/aledbf/ingress-controller?branch=master)
